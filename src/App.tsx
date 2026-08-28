@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus } from 'lucide-react'
 import './cash.css'
 
@@ -23,13 +23,15 @@ const tracked=(p:Product)=>p.trackStock!==false
 const sameDay=(iso:string,date=new Date())=>new Date(iso).toDateString()===date.toDateString()
 const parseMoney=(value:string)=>Number(value.replace(/\./g,'').replace(',','.'))||0
 const nextId=(items:{id:number}[])=>Math.max(0,...items.map(i=>i.id))+1
+const loadStorage=<T,>(key:string,fallback:T):T=>{try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch{return fallback}}
 
 export default function App(){
- const [products,setProducts]=useState<Product[]>(()=>JSON.parse(localStorage.getItem('bdc_products')||'null')||initialProducts)
- const [sales,setSales]=useState<Sale[]>(()=>JSON.parse(localStorage.getItem('bdc_sales')||'[]'))
- const [movements,setMovements]=useState<StockMovement[]>(()=>JSON.parse(localStorage.getItem('bdc_movements')||'[]'))
- const [closings,setClosings]=useState<CashClosing[]>(()=>JSON.parse(localStorage.getItem('bdc_closings')||'[]'))
- const [cashMovements,setCashMovements]=useState<CashMovement[]>(()=>JSON.parse(localStorage.getItem('bdc_cash_movements')||'[]'))
+ const [products,setProducts]=useState<Product[]>(()=>loadStorage('bdc_products',initialProducts))
+ const [sales,setSales]=useState<Sale[]>(()=>loadStorage('bdc_sales',[]))
+ const [movements,setMovements]=useState<StockMovement[]>(()=>loadStorage('bdc_movements',[]))
+ const [closings,setClosings]=useState<CashClosing[]>(()=>loadStorage('bdc_closings',[]))
+ const [cashMovements,setCashMovements]=useState<CashMovement[]>(()=>loadStorage('bdc_cash_movements',[]))
+ const saleLock=useRef(false)
  const [cart,setCart]=useState<CartItem[]>([])
  const [tab,setTab]=useState<Tab>('vender')
  const [query,setQuery]=useState('')
@@ -103,7 +105,8 @@ export default function App(){
  const cashKey=(key:string)=>{if(key==='C'){setReceived('');return}if(key==='⌫'){setReceived(v=>v.slice(0,-1));return}if(key===','&&received.includes(','))return;setReceived(v=>`${v}${key}`.replace(/^0+(?=\d)/,''))}
 
  const finishSale=(payment:Payment,cash?:number)=>{
-   if(!cart.length)return
+   if(!cart.length||saleLock.current)return
+   saleLock.current=true
    const saleId=nextId(sales)
    const sale:Sale={id:saleId,createdAt:new Date().toISOString(),payment,total,received:cash,change:cash!==undefined?cash-total:undefined,items:cartDetails.map(i=>({productId:i.product.id,name:i.product.name,qty:i.qty,price:i.product.price,trackStock:i.product.trackStock}))}
    setSales(prev=>[sale,...prev])
@@ -114,9 +117,9 @@ export default function App(){
  const choosePayment=(p:Payment)=>{if(p==='Dinheiro'){setCashOpen(true);setReceived('')}else finishSale(p)}
  const cancelSale=(s:Sale)=>{
    if(s.canceledAt||!confirm(`Cancelar a venda #${String(s.id).padStart(4,'0')}? O estoque será devolvido.`))return
-   setProducts(prev=>prev.map(p=>{const i=s.items.find(x=>x.productId===p.id);return i&&i.trackStock!==false&&tracked(p)?{...p,stock:p.stock+i.qty}:p}))
+   setProducts(prev=>prev.map(p=>{const i=s.items.find(x=>x.productId===p.id);return i&&i.trackStock!==false?{...p,stock:p.stock+i.qty}:p}))
    setSales(prev=>prev.map(x=>x.id===s.id?{...x,canceledAt:new Date().toISOString()}:x))
-   s.items.forEach(i=>{const p=products.find(x=>x.id===i.productId);if(p&&i.trackStock!==false&&tracked(p))addMovement(p,'Cancelamento',i.qty,`Cancelamento da venda #${String(s.id).padStart(4,'0')}`,s.id)})
+   s.items.forEach(i=>{const p=products.find(x=>x.id===i.productId);if(p&&i.trackStock!==false)addMovement(p,'Cancelamento',i.qty,`Cancelamento da venda #${String(s.id).padStart(4,'0')}`,s.id)})
    setSaleModal(null)
  }
 
@@ -131,6 +134,7 @@ export default function App(){
  }
 
  const saveProduct=(data:Omit<Product,'id'|'active'>,editing?:Product|null)=>{
+   if(data.barcode&&products.some(p=>p.barcode===data.barcode&&p.id!==editing?.id)){alert('Este código de barras já está vinculado a outro produto.');return}
    if(editing){setProducts(prev=>prev.map(p=>p.id===editing.id?{...p,...data}:p));setProductModal(undefined);return}
    const id=nextId(products);const product:Product={...data,id,active:true}
    setProducts(prev=>[...prev,product]);setLastCreatedId(id);setProductModal(undefined);setTab('estoque')
@@ -179,7 +183,7 @@ export default function App(){
        <aside className="cart-panel">
         <div className="cart-title"><div><ShoppingCart size={21}/><strong>Carrinho</strong></div><span>{cart.reduce((a,b)=>a+b.qty,0)} itens</span></div>
         <div className="cart-items">{!cartDetails.length?<div className="empty"><ShoppingCart size={38}/><p>Seu carrinho está vazio</p><small>Clique em um produto para adicionar.</small></div>:cartDetails.map(i=><div className="cart-item" key={i.productId}><div className="cart-item-name"><strong>{i.product.name}</strong><small>{money(i.product.price)} cada</small></div><div className="qty"><button onClick={()=>updateQty(i.productId,-1)}>−</button><span>{i.qty}</span><button onClick={()=>updateQty(i.productId,1)}>+</button></div><b>{money(i.product.price*i.qty)}</b></div>)}</div>
-        <div className="cart-footer"><div className="total"><span>Total</span><strong>{money(total)}</strong></div><button className="primary" disabled={!cart.length} onClick={()=>{setCashOpen(false);setReceived('');setPaymentOpen(true)}}>Finalizar venda</button></div>
+        <div className="cart-footer"><div className="total"><span>Total</span><strong>{money(total)}</strong></div><button className="primary" disabled={!cart.length} onClick={()=>{saleLock.current=false;setCashOpen(false);setReceived('');setPaymentOpen(true)}}>Finalizar venda</button></div>
        </aside>
       </div>
     </>}
@@ -229,7 +233,7 @@ function Metric({label,value}:{label:string,value:string}){return <div className
 
 function ProductModal({product,onClose,onSave}:{product:Product|null,onClose:()=>void,onSave:(p:Omit<Product,'id'|'active'>,editing?:Product|null)=>void}){
  const[name,setName]=useState(product?.name||''),[price,setPrice]=useState(product?String(product.price).replace('.',','):''),[stock,setStock]=useState(product?String(product.stock):''),[barcode,setBarcode]=useState(product?.barcode||''),[category,setCategory]=useState<Category>(product?.category||'Bebidas'),[trackStock,setTrackStock]=useState(product?tracked(product):true)
- return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();if(!name||!price)return;onSave({name,price:parseMoney(price),stock:trackStock?Number(stock)||0:0,barcode:barcode||undefined,category,trackStock},product)}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>{product?'Editar produto':'Novo produto'}</h2><p>{product?'Atualize os dados sem perder o histórico.':'O mínimo necessário para colocar algo à venda.'}</p><label>Nome<input value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Coca-Cola 2L" required/></label><div className="form-row"><label>Preço<input value={price} onChange={e=>setPrice(e.target.value)} placeholder="12,00" inputMode="decimal" required/></label>{trackStock&&<label>Estoque atual<input value={stock} onChange={e=>setStock(e.target.value)} placeholder="12" inputMode="numeric"/></label>}</div><label>Categoria<select value={category} onChange={e=>setCategory(e.target.value as Category)}>{['Bebidas','Comidas','Doses','Tabacaria','Outros'].map(c=><option key={c}>{c}</option>)}</select></label><label>Código de barras <small>(opcional)</small><input value={barcode} onChange={e=>setBarcode(e.target.value)} placeholder="Digite ou escaneie"/></label><label className="check-label"><input type="checkbox" checked={trackStock} onChange={e=>setTrackStock(e.target.checked)}/> Controlar estoque deste produto</label><button className="primary" type="submit">{product?'Salvar alterações':'Salvar produto'}</button></form></div>
+ return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();if(!name||!price)return;onSave({name,price:parseMoney(price),stock:product?product.stock:trackStock?Number(stock)||0:0,barcode:barcode||undefined,category,trackStock},product)}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>{product?'Editar produto':'Novo produto'}</h2><p>{product?'Atualize os dados sem perder o histórico.':'O mínimo necessário para colocar algo à venda.'}</p><label>Nome<input value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Coca-Cola 2L" required/></label><div className="form-row"><label>Preço<input value={price} onChange={e=>setPrice(e.target.value)} placeholder="12,00" inputMode="decimal" required/></label>{trackStock&&<label>Estoque atual {product&&<small>(use a tela Estoque)</small>}<input value={stock} onChange={e=>setStock(e.target.value)} placeholder="12" inputMode="numeric" disabled={Boolean(product)}/></label>}</div><label>Categoria<select value={category} onChange={e=>setCategory(e.target.value as Category)}>{['Bebidas','Comidas','Doses','Tabacaria','Outros'].map(c=><option key={c}>{c}</option>)}</select></label><label>Código de barras <small>(opcional)</small><input value={barcode} onChange={e=>setBarcode(e.target.value)} placeholder="Digite ou escaneie"/></label><label className="check-label"><input type="checkbox" checked={trackStock} onChange={e=>setTrackStock(e.target.checked)}/> Controlar estoque deste produto</label><button className="primary" type="submit">{product?'Salvar alterações':'Salvar produto'}</button></form></div>
 }
 
 function StockModal({product,onClose,onSave}:{product:Product,onClose:()=>void,onSave:(p:Product,delta:number,note:string)=>void}){
