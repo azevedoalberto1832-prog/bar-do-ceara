@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye } from 'lucide-react'
+import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus } from 'lucide-react'
+import './cash.css'
 
 type Category = 'Bebidas' | 'Comidas' | 'Doses' | 'Tabacaria' | 'Outros'
 type Payment = 'Pix' | 'Dinheiro' | 'Débito' | 'Crédito'
@@ -10,7 +11,9 @@ type Sale = { id:number; createdAt:string; payment:Payment; total:number; receiv
 type MovementKind = 'Venda' | 'Entrada' | 'Saída' | 'Ajuste' | 'Cancelamento' | 'Cadastro'
 type StockMovement = { id:number; productId:number; productName:string; kind:MovementKind; qty:number; createdAt:string; note?:string; saleId?:number }
 type CashClosing = { id:number; createdAt:string; opening:number; expected:number; counted:number; difference:number; notes?:string }
-type Tab = 'vender'|'historico'|'estoque'|'produtos'|'resumo'
+type CashMovement = { id:number; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number }
+type CashRow = { key:string; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number; origin:'Venda'|'Manual'; saleId?:number; manual?:CashMovement }
+type Tab = 'vender'|'historico'|'estoque'|'produtos'|'caixa'|'resumo'
 
 const initialProducts: Product[] = [
 {id:1,name:'Coca-Cola Lata',category:'Bebidas',price:6,stock:24,barcode:'7894900011517',active:true},{id:2,name:'Coca-Cola 2L',category:'Bebidas',price:12,stock:10,barcode:'7894900027013',active:true},{id:3,name:'Guaraná Lata',category:'Bebidas',price:5,stock:18,active:true},{id:4,name:'Água 500ml',category:'Bebidas',price:4,stock:30,active:true},{id:5,name:'Del Valle Uva',category:'Bebidas',price:6,stock:12,active:true},{id:6,name:'Del Valle Pêssego',category:'Bebidas',price:6,stock:10,active:true},{id:7,name:'Energético',category:'Bebidas',price:12,stock:14,active:true},{id:8,name:'Água com Gás',category:'Bebidas',price:5,stock:16,active:true},{id:9,name:'Jantinha Completa',category:'Comidas',price:18,stock:0,active:true,trackStock:false},{id:10,name:'Espetinho Carne',category:'Comidas',price:10,stock:0,active:true,trackStock:false},{id:11,name:'Espetinho Frango',category:'Comidas',price:9,stock:0,active:true,trackStock:false},{id:12,name:'Porção de Batata',category:'Comidas',price:20,stock:0,active:true,trackStock:false},{id:13,name:'Salgado',category:'Comidas',price:7,stock:15,active:true},{id:14,name:'Dose Cachaça',category:'Doses',price:5,stock:0,active:true,trackStock:false},{id:15,name:'Dose Whisky',category:'Doses',price:12,stock:0,active:true,trackStock:false},{id:16,name:'Dose Vodka',category:'Doses',price:9,stock:0,active:true,trackStock:false},{id:17,name:'Dose Campari',category:'Doses',price:10,stock:0,active:true,trackStock:false},{id:18,name:'Palheiro Tradicional',category:'Tabacaria',price:3,stock:50,active:true},{id:19,name:'Palheiro Menta',category:'Tabacaria',price:3.5,stock:35,active:true},{id:20,name:'Isqueiro',category:'Tabacaria',price:6,stock:20,active:true},{id:21,name:'Chiclete',category:'Outros',price:2,stock:40,active:true},{id:22,name:'Paçoca',category:'Outros',price:2.5,stock:25,active:true},{id:23,name:'Gelo 3kg',category:'Outros',price:10,stock:8,active:true},{id:24,name:'Carvão 3kg',category:'Outros',price:18,stock:7,active:true},{id:25,name:'Copo Descartável',category:'Outros',price:1,stock:100,active:true}]
@@ -26,6 +29,7 @@ export default function App(){
  const [sales,setSales]=useState<Sale[]>(()=>JSON.parse(localStorage.getItem('bdc_sales')||'[]'))
  const [movements,setMovements]=useState<StockMovement[]>(()=>JSON.parse(localStorage.getItem('bdc_movements')||'[]'))
  const [closings,setClosings]=useState<CashClosing[]>(()=>JSON.parse(localStorage.getItem('bdc_closings')||'[]'))
+ const [cashMovements,setCashMovements]=useState<CashMovement[]>(()=>JSON.parse(localStorage.getItem('bdc_cash_movements')||'[]'))
  const [cart,setCart]=useState<CartItem[]>([])
  const [tab,setTab]=useState<Tab>('vender')
  const [query,setQuery]=useState('')
@@ -40,11 +44,15 @@ export default function App(){
  const [lastCreatedId,setLastCreatedId]=useState<number|null>(null)
  const [historyQuery,setHistoryQuery]=useState('')
  const [historyPayment,setHistoryPayment]=useState<'Todos'|Payment>('Todos')
+ const [cashModal,setCashModal]=useState<CashMovement|null|undefined>(undefined)
+ const [cashQuery,setCashQuery]=useState('')
+ const [cashType,setCashType]=useState<'todos'|'entrada'|'saida'>('todos')
 
  useEffect(()=>localStorage.setItem('bdc_products',JSON.stringify(products)),[products])
  useEffect(()=>localStorage.setItem('bdc_sales',JSON.stringify(sales)),[sales])
  useEffect(()=>localStorage.setItem('bdc_movements',JSON.stringify(movements)),[movements])
  useEffect(()=>localStorage.setItem('bdc_closings',JSON.stringify(closings)),[closings])
+ useEffect(()=>localStorage.setItem('bdc_cash_movements',JSON.stringify(cashMovements)),[cashMovements])
 
  const filtered=useMemo(()=>products.filter(p=>p.active&&(category==='Todos'||p.category===category)&&(!query||p.name.toLowerCase().includes(query.toLowerCase())||p.barcode?.includes(query))),[products,category,query])
  const cartDetails=cart.map(i=>({...i,product:products.find(p=>p.id===i.productId)!})).filter(i=>i.product)
@@ -52,7 +60,6 @@ export default function App(){
  const activeSales=sales.filter(s=>!s.canceledAt)
  const todaySales=activeSales.filter(s=>sameDay(s.createdAt))
  const todayRevenue=todaySales.reduce((a,b)=>a+b.total,0)
- const todayCash=todaySales.filter(s=>s.payment==='Dinheiro').reduce((a,b)=>a+b.total,0)
  const paymentTotals=(['Pix','Dinheiro','Débito','Crédito'] as Payment[]).map(p=>({label:p,value:todaySales.filter(s=>s.payment===p).reduce((a,b)=>a+b.total,0)}))
  const topProducts=useMemo(()=>{const m=new Map<string,number>();todaySales.flatMap(s=>s.items).forEach(i=>m.set(i.name,(m.get(i.name)||0)+i.qty));return[...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5)},[todaySales])
  const stockProducts=[...products.filter(p=>p.active)].sort((a,b)=>b.id-a.id)
@@ -60,6 +67,18 @@ export default function App(){
  const change=Math.max(0,receivedNumber-total)
  const lowStock=products.filter(p=>p.active&&tracked(p)&&p.stock<=5)
  const latestClosing=[...closings].sort((a,b)=>b.id-a.id)[0]
+ const cashRows=useMemo<CashRow[]>(()=>[
+   ...activeSales.map(s=>({key:`sale-${s.id}`,createdAt:s.createdAt,type:'entrada' as const,description:`Venda #${String(s.id).padStart(4,'0')}`,category:'Vendas',payment:s.payment,amount:s.total,origin:'Venda' as const,saleId:s.id})),
+   ...cashMovements.map(m=>({key:`manual-${m.id}`,...m,origin:'Manual' as const,manual:m}))
+ ].sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()),[activeSales,cashMovements])
+ const filteredCashRows=useMemo(()=>cashRows.filter(r=>{
+   const text=`${r.description} ${r.category} ${r.payment} ${r.origin}`.toLowerCase()
+   return (cashType==='todos'||r.type===cashType)&&(!cashQuery||text.includes(cashQuery.toLowerCase()))
+ }),[cashRows,cashType,cashQuery])
+ const cashTotals=cashRows.reduce((acc,r)=>{acc[r.type]+=r.amount;return acc},{entrada:0,saida:0})
+ const todayCashRows=cashRows.filter(r=>sameDay(r.createdAt))
+ const todayCashBalance=todayCashRows.reduce((sum,r)=>sum+(r.type==='entrada'?r.amount:-r.amount),0)
+ const todayPhysicalCash=todayCashRows.filter(r=>r.payment==='Dinheiro').reduce((sum,r)=>sum+(r.type==='entrada'?r.amount:-r.amount),0)
 
  const insights=useMemo(()=>{
    const items=todaySales.flatMap(s=>s.items).reduce((a,b)=>a+b.qty,0)
@@ -119,6 +138,15 @@ export default function App(){
  }
  const deactivateProduct=(p:Product)=>{const used=sales.some(s=>s.items.some(i=>i.productId===p.id));if(used)setProducts(x=>x.map(v=>v.id===p.id?{...v,active:false}:v));else setProducts(x=>x.filter(v=>v.id!==p.id))}
  const reactivateProduct=(p:Product)=>setProducts(x=>x.map(v=>v.id===p.id?{...v,active:true}:v))
+ const saveCashMovement=(data:Omit<CashMovement,'id'>,editing?:CashMovement|null)=>{
+   if(editing)setCashMovements(prev=>prev.map(m=>m.id===editing.id?{...data,id:m.id}:m))
+   else setCashMovements(prev=>[{...data,id:nextId(prev)},...prev])
+   setCashModal(undefined)
+ }
+ const deleteCashMovement=(movement:CashMovement)=>{
+   if(!confirm(`Excluir o lançamento "${movement.description}"?`))return
+   setCashMovements(prev=>prev.filter(m=>m.id!==movement.id))
+ }
 
  const filteredSales=useMemo(()=>sales.filter(s=>{
    const text=`${s.id} ${s.payment} ${s.items.map(i=>i.name).join(' ')}`.toLowerCase()
@@ -133,6 +161,7 @@ export default function App(){
       <Nav icon={<History size={20}/>} label="Histórico" active={tab==='historico'} onClick={()=>setTab('historico')}/>
       <Nav icon={<Boxes size={20}/>} label="Estoque" active={tab==='estoque'} onClick={()=>setTab('estoque')}/>
       <Nav icon={<PackagePlus size={20}/>} label="Produtos" active={tab==='produtos'} onClick={()=>setTab('produtos')}/>
+      <Nav icon={<Landmark size={20}/>} label="Caixa" active={tab==='caixa'} onClick={()=>setTab('caixa')}/>
       <Nav icon={<BarChart3 size={20}/>} label="Resumo" active={tab==='resumo'} onClick={()=>setTab('resumo')}/>
     </nav>
     <div className="sidebar-status"><span/>Funcionando offline</div>
@@ -170,6 +199,13 @@ export default function App(){
       <div className="table-card"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Código</th><th>Status</th><th></th></tr></thead><tbody>{products.map(p=><tr key={p.id} className={!p.active?'row-muted':''}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{money(p.price)}</td><td>{tracked(p)?p.stock:'Livre'}</td><td>{p.barcode||'Manual'}</td><td>{p.active?<span className="status-ok">Ativo</span>:<span className="status-canceled">Inativo</span>}</td><td><div className="row-actions"><button className="icon-btn" onClick={()=>setProductModal(p)} title="Editar"><Pencil size={17}/></button>{p.active?<button className="icon-danger" onClick={()=>deactivateProduct(p)} title="Desativar"><Trash2 size={17}/></button>:<button className="icon-btn" onClick={()=>reactivateProduct(p)} title="Reativar"><RotateCcw size={17}/></button>}</div></td></tr>)}</tbody></table></div>
     </Section>}
 
+    {tab==='caixa'&&<Section title="Caixa" subtitle="Entradas e saídas em uma visão de planilha, com vendas integradas automaticamente." action={<button className="primary small" onClick={()=>setCashModal(null)}><Plus size={17}/> Novo lançamento</button>}>
+      <div className="cash-summary"><div><span>Entradas</span><strong className="good">{money(cashTotals.entrada)}</strong></div><div><span>Saídas</span><strong className="bad">{money(cashTotals.saida)}</strong></div><div><span>Saldo geral</span><strong>{money(cashTotals.entrada-cashTotals.saida)}</strong></div><div><span>Saldo de hoje</span><strong>{money(todayCashBalance)}</strong></div></div>
+      <div className="toolbar cash-toolbar"><div className="search compact"><Search size={18}/><input value={cashQuery} onChange={e=>setCashQuery(e.target.value)} placeholder="Buscar descrição, categoria ou pagamento"/></div><select value={cashType} onChange={e=>setCashType(e.target.value as typeof cashType)}><option value="todos">Todas</option><option value="entrada">Entradas</option><option value="saida">Saídas</option></select></div>
+      <div className="table-card cash-sheet"><table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Pagamento</th><th>Origem</th><th>Valor</th><th></th></tr></thead><tbody>{filteredCashRows.map(r=><tr key={r.key}><td>{new Date(r.createdAt).toLocaleString('pt-BR')}</td><td><span className={r.type==='entrada'?'cash-kind cash-in':'cash-kind cash-out'}>{r.type==='entrada'?'Entrada':'Saída'}</span></td><td><strong>{r.description}</strong></td><td>{r.category}</td><td>{r.payment}</td><td><span className="pill">{r.origin}</span></td><td><strong className={r.type==='entrada'?'good':'bad'}>{r.type==='entrada'?'+ ':'− '}{money(r.amount)}</strong></td><td>{r.manual?<div className="row-actions"><button className="icon-btn" onClick={()=>setCashModal(r.manual)} title="Editar lançamento"><Pencil size={17}/></button><button className="icon-danger" onClick={()=>deleteCashMovement(r.manual!)} title="Excluir lançamento"><Trash2 size={17}/></button></div>:<button className="icon-btn" onClick={()=>setSaleModal(sales.find(s=>s.id===r.saleId)||null)} title="Abrir venda"><Eye size={17}/></button>}</td></tr>)}</tbody></table>{!filteredCashRows.length&&<div className="empty-table">Nenhum lançamento encontrado.</div>}</div>
+      <p className="sheet-note">As vendas entram automaticamente e ficam protegidas. Lançamentos manuais podem ser criados, editados ou excluídos a qualquer momento.</p>
+    </Section>}
+
     {tab==='resumo'&&<Section title="Resumo do dia" subtitle="Venda, caixa e sinais operacionais em uma tela." action={<button className="primary small" onClick={()=>setClosingOpen(true)}><WalletCards size={17}/> Fechar caixa</button>}>
       <div className="metrics"><Metric label="Faturamento" value={money(todayRevenue)}/><Metric label="Vendas" value={String(todaySales.length)}/><Metric label="Ticket médio" value={money(todaySales.length?todayRevenue/todaySales.length:0)}/><Metric label="Itens vendidos" value={String(todaySales.flatMap(s=>s.items).reduce((a,b)=>a+b.qty,0))}/></div>
       <div className="dashboard-grid"><div className="panel"><h3>Por forma de pagamento</h3>{paymentTotals.map(p=><div className="pay-line" key={p.label}><span>{p.label}</span><strong>{money(p.value)}</strong></div>)}</div><div className="panel"><h3>Mais vendidos hoje</h3>{topProducts.length?topProducts.map(([n,q],i)=><div className="rank" key={n}><span>{i+1}</span><p>{n}</p><strong>{q}</strong></div>):<p className="muted">Ainda não houve vendas hoje.</p>}</div></div>
@@ -182,7 +218,8 @@ export default function App(){
    {productModal!==undefined&&<ProductModal product={productModal} onClose={()=>setProductModal(undefined)} onSave={saveProduct}/>} 
    {stockModal&&<StockModal product={stockModal} onClose={()=>setStockModal(null)} onSave={adjustStock}/>} 
    {saleModal&&<SaleModal sale={saleModal} onClose={()=>setSaleModal(null)} onCancel={cancelSale}/>} 
-   {closingOpen&&<ClosingModal cashSales={todayCash} onClose={()=>setClosingOpen(false)} onSave={(opening,counted,notes)=>{const expected=opening+todayCash;setClosings(prev=>[{id:nextId(prev),createdAt:new Date().toISOString(),opening,expected,counted,difference:counted-expected,notes},...prev]);setClosingOpen(false)}}/>}
+   {closingOpen&&<ClosingModal cashSales={todayPhysicalCash} onClose={()=>setClosingOpen(false)} onSave={(opening,counted,notes)=>{const expected=opening+todayPhysicalCash;setClosings(prev=>[{id:nextId(prev),createdAt:new Date().toISOString(),opening,expected,counted,difference:counted-expected,notes},...prev]);setClosingOpen(false)}}/>}
+   {cashModal!==undefined&&<CashMovementModal movement={cashModal} onClose={()=>setCashModal(undefined)} onSave={saveCashMovement}/>}
  </div>
 }
 
@@ -209,4 +246,9 @@ function ClosingModal({cashSales,onClose,onSave}:{cashSales:number,onClose:()=>v
  const[opening,setOpening]=useState('0'),[counted,setCounted]=useState(''),[notes,setNotes]=useState('')
  const open=parseMoney(opening),count=parseMoney(counted),expected=open+cashSales,difference=count-expected
  return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();onSave(open,count,notes)}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>Fechamento de caixa</h2><p>Confira apenas o dinheiro físico. Pix e cartões já estão separados no resumo.</p><label>Fundo inicial<input value={opening} onChange={e=>setOpening(e.target.value)} inputMode="decimal"/></label><div className="preview-line"><span>Vendas em dinheiro</span><strong>{money(cashSales)}</strong></div><div className="preview-line"><span>Dinheiro esperado</span><strong>{money(expected)}</strong></div><label>Dinheiro contado<input value={counted} onChange={e=>setCounted(e.target.value)} inputMode="decimal" placeholder="0,00" required/></label><div className="preview-line emphasis"><span>Diferença</span><strong className={difference===0?'good':difference<0?'bad':''}>{money(difference)}</strong></div><label>Observação <small>(opcional)</small><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: troco deixado no caixa"/></label><button className="primary" type="submit">Salvar fechamento</button></form></div>
+}
+
+function CashMovementModal({movement,onClose,onSave}:{movement:CashMovement|null,onClose:()=>void,onSave:(data:Omit<CashMovement,'id'>,editing?:CashMovement|null)=>void}){
+ const[type,setType]=useState<'entrada'|'saida'>(movement?.type||'saida'),[description,setDescription]=useState(movement?.description||''),[category,setCategory]=useState(movement?.category||''),[payment,setPayment]=useState<Payment|'Outro'>(movement?.payment||'Dinheiro'),[amount,setAmount]=useState(movement?String(movement.amount).replace('.',','):''),[date,setDate]=useState(()=>{const d=movement?new Date(movement.createdAt):new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)})
+ return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();const value=parseMoney(amount);if(!description.trim()||!value)return;onSave({type,description:description.trim(),category:category.trim()||'Outros',payment,amount:value,createdAt:new Date(date).toISOString()},movement)}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>{movement?'Editar lançamento':'Novo lançamento'}</h2><p>Controle total para registrar receitas, compras, despesas, sangrias e ajustes.</p><div className="switch"><button type="button" className={type==='entrada'?'active cash-entry-button':''} onClick={()=>setType('entrada')}>Entrada</button><button type="button" className={type==='saida'?'active cash-exit-button':''} onClick={()=>setType('saida')}>Saída</button></div><label>Descrição<input autoFocus value={description} onChange={e=>setDescription(e.target.value)} placeholder="Ex.: compra de bebidas, conta de luz" required/></label><div className="form-row"><label>Categoria<input value={category} onChange={e=>setCategory(e.target.value)} placeholder="Ex.: Fornecedor, Despesa"/></label><label>Valor<input value={amount} onChange={e=>setAmount(e.target.value)} inputMode="decimal" placeholder="0,00" required/></label></div><div className="form-row"><label>Pagamento<select value={payment} onChange={e=>setPayment(e.target.value as Payment|'Outro')}>{['Dinheiro','Pix','Débito','Crédito','Outro'].map(p=><option key={p}>{p}</option>)}</select></label><label>Data e hora<input type="datetime-local" value={date} onChange={e=>setDate(e.target.value)} required/></label></div><button className="primary" type="submit">{movement?'Salvar alterações':'Adicionar ao caixa'}</button></form></div>
 }

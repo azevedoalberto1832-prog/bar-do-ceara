@@ -1,0 +1,44 @@
+.cash-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.cash-summary > div {
+  background: #fff;
+  border: 1px solid #e2ddd3;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.cash-summary span {
+  display: block;
+  color: #747c75;
+  font-size: 12px;
+}
+
+.cash-summary strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 21px;
+}
+
+.cash-toolbar { justify-content: flex-start; }
+.cash-sheet { overflow: auto; }
+.cash-sheet table { min-width: 1050px; }
+.cash-sheet tbody tr:hover { background: #faf9f5; }
+
+.cash-kind {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cash-in { background: #eaf6ee; color: #2d704e; }
+.cash-out { background: #fdecea; color: #9b4b43; }
+.sheet-note { color: #747c75; font-size: 12px; margin: 10px 3px; }
+.cash-entry-button.active { background: #28704f !important; border-color: #28704f !important; }
+.cash-exit-button.active { background: #a44740 !important; border-color: #a44740 !important; }
