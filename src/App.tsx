@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus, Users, UtensilsCrossed, Phone } from 'lucide-react'
+import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus, Users, UtensilsCrossed, Phone, ClipboardList, MapPin } from 'lucide-react'
 import './cash.css'
 import './bar.css'
 
@@ -8,6 +8,10 @@ type Payment = 'Pix' | 'Dinheiro' | 'Débito' | 'Crédito'
 type SalesArea = 'mercearia'|'bar'|'ambos'
 type Product = { id:number; name:string; category:Category; price:number; stock:number; barcode?:string; active:boolean; trackStock?:boolean; description?:string; photo?:string; salesArea?:SalesArea }
 type Client = { id:number; name:string; phone:string; cpf?:string; createdAt:string }
+type OrderMode = 'local'|'retirada'|'delivery'
+type TicketItem = { productId:number; name:string; qty:number; price:number; notes?:string }
+type KitchenTicket = { id:number; createdAt:string; status:'preparo'; items:TicketItem[] }
+type ServiceTab = { id:number; clientId:number; mode:OrderMode; table?:string; address?:string; notes?:string; createdAt:string; tickets:KitchenTicket[]; status:'aberta' }
 type CartItem = { productId:number; qty:number }
 type SaleItem = { productId:number; name:string; qty:number; price:number; trackStock?:boolean }
 type Sale = { id:number; createdAt:string; payment:Payment; total:number; received?:number; change?:number; items:SaleItem[]; canceledAt?:string }
@@ -16,7 +20,7 @@ type StockMovement = { id:number; productId:number; productName:string; kind:Mov
 type CashClosing = { id:number; createdAt:string; opening:number; expected:number; counted:number; difference:number; notes?:string }
 type CashMovement = { id:number; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number }
 type CashRow = { key:string; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number; origin:'Venda'|'Manual'; saleId?:number; manual?:CashMovement }
-type Tab = 'vender'|'historico'|'estoque'|'produtos'|'cardapio'|'clientes'|'caixa'|'resumo'
+type Tab = 'vender'|'comandas'|'historico'|'estoque'|'produtos'|'cardapio'|'clientes'|'caixa'|'resumo'
 
 const initialProducts: Product[] = [
 {id:1,name:'Coca-Cola Lata',category:'Bebidas',price:6,stock:24,barcode:'7894900011517',active:true},{id:2,name:'Coca-Cola 2L',category:'Bebidas',price:12,stock:10,barcode:'7894900027013',active:true},{id:3,name:'Guaraná Lata',category:'Bebidas',price:5,stock:18,active:true},{id:4,name:'Água 500ml',category:'Bebidas',price:4,stock:30,active:true},{id:5,name:'Del Valle Uva',category:'Bebidas',price:6,stock:12,active:true},{id:6,name:'Del Valle Pêssego',category:'Bebidas',price:6,stock:10,active:true},{id:7,name:'Energético',category:'Bebidas',price:12,stock:14,active:true},{id:8,name:'Água com Gás',category:'Bebidas',price:5,stock:16,active:true},{id:9,name:'Jantinha Completa',category:'Comidas',price:18,stock:0,active:true,trackStock:false},{id:10,name:'Espetinho Carne',category:'Comidas',price:10,stock:0,active:true,trackStock:false},{id:11,name:'Espetinho Frango',category:'Comidas',price:9,stock:0,active:true,trackStock:false},{id:12,name:'Porção de Batata',category:'Comidas',price:20,stock:0,active:true,trackStock:false},{id:13,name:'Salgado',category:'Comidas',price:7,stock:15,active:true},{id:14,name:'Dose Cachaça',category:'Doses',price:5,stock:0,active:true,trackStock:false},{id:15,name:'Dose Whisky',category:'Doses',price:12,stock:0,active:true,trackStock:false},{id:16,name:'Dose Vodka',category:'Doses',price:9,stock:0,active:true,trackStock:false},{id:17,name:'Dose Campari',category:'Doses',price:10,stock:0,active:true,trackStock:false},{id:18,name:'Palheiro Tradicional',category:'Tabacaria',price:3,stock:50,active:true},{id:19,name:'Palheiro Menta',category:'Tabacaria',price:3.5,stock:35,active:true},{id:20,name:'Isqueiro',category:'Tabacaria',price:6,stock:20,active:true},{id:21,name:'Chiclete',category:'Outros',price:2,stock:40,active:true},{id:22,name:'Paçoca',category:'Outros',price:2.5,stock:25,active:true},{id:23,name:'Gelo 3kg',category:'Outros',price:10,stock:8,active:true},{id:24,name:'Carvão 3kg',category:'Outros',price:18,stock:7,active:true},{id:25,name:'Copo Descartável',category:'Outros',price:1,stock:100,active:true}]
@@ -45,6 +49,7 @@ const productArea=(p:Product):SalesArea=>p.salesArea||(['Bebidas','Comidas','Dos
 export default function App(){
  const [products,setProducts]=useState<Product[]>(()=>withBarSeeds(loadStorage('bdc_products',initialProducts)))
  const [clients,setClients]=useState<Client[]>(()=>loadStorage('bdc_clients',[]))
+ const [serviceTabs,setServiceTabs]=useState<ServiceTab[]>(()=>loadStorage('bdc_service_tabs',[]))
  const [sales,setSales]=useState<Sale[]>(()=>loadStorage('bdc_sales',[]))
  const [movements,setMovements]=useState<StockMovement[]>(()=>loadStorage('bdc_movements',[]))
  const [closings,setClosings]=useState<CashClosing[]>(()=>loadStorage('bdc_closings',[]))
@@ -71,6 +76,9 @@ export default function App(){
  const [clientQuery,setClientQuery]=useState('')
  const [barProductModal,setBarProductModal]=useState<Product|null|undefined>(undefined)
  const [barQuery,setBarQuery]=useState('')
+ const [serviceTabModal,setServiceTabModal]=useState(false)
+ const [activeServiceTab,setActiveServiceTab]=useState<ServiceTab|null>(null)
+ const [serviceQuery,setServiceQuery]=useState('')
 
  useEffect(()=>localStorage.setItem('bdc_products',JSON.stringify(products)),[products])
  useEffect(()=>localStorage.setItem('bdc_sales',JSON.stringify(sales)),[sales])
@@ -78,6 +86,7 @@ export default function App(){
  useEffect(()=>localStorage.setItem('bdc_closings',JSON.stringify(closings)),[closings])
  useEffect(()=>localStorage.setItem('bdc_cash_movements',JSON.stringify(cashMovements)),[cashMovements])
  useEffect(()=>localStorage.setItem('bdc_clients',JSON.stringify(clients)),[clients])
+ useEffect(()=>localStorage.setItem('bdc_service_tabs',JSON.stringify(serviceTabs)),[serviceTabs])
 
  const filtered=useMemo(()=>products.filter(p=>p.active&&productArea(p)!=='bar'&&(category==='Todos'||p.category===category)&&(!query||p.name.toLowerCase().includes(query.toLowerCase())||p.barcode?.includes(query))),[products,category,query])
  const cartDetails=cart.map(i=>({...i,product:products.find(p=>p.id===i.productId)!})).filter(i=>i.product)
@@ -90,6 +99,7 @@ export default function App(){
  const stockProducts=[...products.filter(p=>p.active)].sort((a,b)=>b.id-a.id)
  const barProducts=useMemo(()=>products.filter(p=>p.active&&productArea(p)!=='mercearia'&&(!barQuery||`${p.name} ${p.description||''} ${p.category}`.toLowerCase().includes(barQuery.toLowerCase()))),[products,barQuery])
  const filteredClients=useMemo(()=>clients.filter(c=>!clientQuery||`${c.name} ${c.phone} ${c.cpf||''}`.toLowerCase().includes(clientQuery.toLowerCase())),[clients,clientQuery])
+ const filteredServiceTabs=useMemo(()=>serviceTabs.filter(t=>{const c=clients.find(x=>x.id===t.clientId);return !serviceQuery||`${c?.name||''} ${c?.phone||''} ${t.id} ${t.table||''}`.toLowerCase().includes(serviceQuery.toLowerCase())}),[serviceTabs,clients,serviceQuery])
  const receivedNumber=parseMoney(received)
  const change=Math.max(0,receivedNumber-total)
  const lowStock=products.filter(p=>p.active&&tracked(p)&&p.stock<=5)
@@ -183,6 +193,22 @@ export default function App(){
    else setClients(prev=>[{...data,id:nextId(prev),createdAt:new Date().toISOString()},...prev])
    setClientModal(undefined)
  }
+ const openServiceTab=(data:{clientId?:number;name?:string;phone?:string;cpf?:string;mode:OrderMode;table?:string;address?:string;notes?:string})=>{
+   let clientId=data.clientId
+   if(!clientId){
+     const normalized=(data.phone||'').replace(/\D/g,'')
+     const existing=clients.find(c=>c.phone.replace(/\D/g,'')===normalized)
+     if(existing)clientId=existing.id
+     else {clientId=nextId(clients);setClients(prev=>[{id:clientId!,name:data.name!.trim(),phone:data.phone!.trim(),cpf:data.cpf?.trim()||undefined,createdAt:new Date().toISOString()},...prev])}
+   }
+   const serviceTab:ServiceTab={id:nextId(serviceTabs),clientId,mode:data.mode,table:data.table?.trim()||undefined,address:data.address?.trim()||undefined,notes:data.notes?.trim()||undefined,createdAt:new Date().toISOString(),tickets:[],status:'aberta'}
+   setServiceTabs(prev=>[serviceTab,...prev]);setServiceTabModal(false);setActiveServiceTab(serviceTab)
+ }
+ const sendKitchenTicket=(serviceTabId:number,items:TicketItem[])=>{
+   const ticket:KitchenTicket={id:Math.max(0,...serviceTabs.flatMap(t=>t.tickets.map(x=>x.id)))+1,createdAt:new Date().toISOString(),status:'preparo',items}
+   setServiceTabs(prev=>prev.map(t=>t.id===serviceTabId?{...t,tickets:[...t.tickets,ticket]}:t))
+   setActiveServiceTab(prev=>prev?.id===serviceTabId?{...prev,tickets:[...prev.tickets,ticket]}:prev)
+ }
 
  const filteredSales=useMemo(()=>sales.filter(s=>{
    const text=`${s.id} ${s.payment} ${s.items.map(i=>i.name).join(' ')}`.toLowerCase()
@@ -191,9 +217,10 @@ export default function App(){
 
  return <div className="app-shell">
    <aside className="sidebar">
-    <div className="brand"><span>BC</span><div><strong>Bar do Ceará</strong><small>PDV local · V0.3</small></div></div>
+    <div className="brand"><span>BC</span><div><strong>Bar do Ceará</strong><small>PDV local · V0.4</small></div></div>
     <nav>
       <Nav icon={<ShoppingCart size={20}/>} label="Vender" active={tab==='vender'} onClick={()=>setTab('vender')}/>
+      <Nav icon={<ClipboardList size={20}/>} label="Comandas" active={tab==='comandas'} onClick={()=>setTab('comandas')}/>
       <Nav icon={<History size={20}/>} label="Histórico" active={tab==='historico'} onClick={()=>setTab('historico')}/>
       <Nav icon={<Boxes size={20}/>} label="Estoque" active={tab==='estoque'} onClick={()=>setTab('estoque')}/>
       <Nav icon={<PackagePlus size={20}/>} label="Produtos" active={tab==='produtos'} onClick={()=>setTab('produtos')}/>
@@ -221,6 +248,12 @@ export default function App(){
        </aside>
       </div>
     </>}
+
+    {tab==='comandas'&&<Section title="Comandas" subtitle="Atendimento por cliente com vários pedidos na mesma conta." action={<button className="primary small" onClick={()=>setServiceTabModal(true)}><Plus size={17}/> Abrir comanda</button>}>
+      <div className="toolbar"><div className="search compact"><Search size={18}/><input value={serviceQuery} onChange={e=>setServiceQuery(e.target.value)} placeholder="Buscar cliente, telefone, mesa ou número"/></div><span className="muted">{serviceTabs.length} abertas</span></div>
+      <div className="service-tab-grid">{filteredServiceTabs.map(t=>{const client=clients.find(c=>c.id===t.clientId);const itemCount=t.tickets.flatMap(x=>x.items).reduce((s,i)=>s+i.qty,0);const tabTotal=t.tickets.flatMap(x=>x.items).reduce((s,i)=>s+i.qty*i.price,0);return <button className="service-tab-card" key={t.id} onClick={()=>setActiveServiceTab(t)}><div className="service-tab-top"><span>Comanda #{String(t.id).padStart(3,'0')}</span><b>{t.mode==='local'?'Consumo local':t.mode==='retirada'?'Retirada':'Delivery'}</b></div><h3>{client?.name||'Cliente'}</h3><p><Phone size={14}/>{client?.phone}</p>{t.table&&<p><MapPin size={14}/>Mesa {t.table}</p>}<div className="service-tab-bottom"><span>{t.tickets.length} pedido{t.tickets.length===1?'':'s'} · {itemCount} itens</span><strong>{money(tabTotal)}</strong></div></button>})}</div>
+      {!filteredServiceTabs.length&&<div className="empty-table">Nenhuma comanda aberta.</div>}
+    </Section>}
 
     {tab==='historico'&&<Section title="Histórico de vendas" subtitle="Vendas auditáveis, inclusive cancelamentos.">
       <div className="toolbar"><div className="search compact"><Search size={18}/><input value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)} placeholder="Buscar venda ou produto"/></div><select value={historyPayment} onChange={e=>setHistoryPayment(e.target.value as 'Todos'|Payment)}><option>Todos</option><option>Pix</option><option>Dinheiro</option><option>Débito</option><option>Crédito</option></select></div>
@@ -270,6 +303,8 @@ export default function App(){
    {cashModal!==undefined&&<CashMovementModal movement={cashModal} onClose={()=>setCashModal(undefined)} onSave={saveCashMovement}/>}
    {clientModal!==undefined&&<ClientModal client={clientModal} onClose={()=>setClientModal(undefined)} onSave={saveClient}/>}
    {barProductModal!==undefined&&<BarProductModal product={barProductModal} onClose={()=>setBarProductModal(undefined)} onSave={saveProduct}/>}
+   {serviceTabModal&&<OpenServiceTabModal clients={clients} onClose={()=>setServiceTabModal(false)} onSave={openServiceTab}/>}
+   {activeServiceTab&&<ServiceTabModal serviceTab={activeServiceTab} client={clients.find(c=>c.id===activeServiceTab.clientId)} products={products.filter(p=>p.active&&productArea(p)!=='mercearia')} onClose={()=>setActiveServiceTab(null)} onSend={sendKitchenTicket}/>}
  </div>
 }
 
@@ -311,4 +346,20 @@ function ClientModal({client,onClose,onSave}:{client:Client|null,onClose:()=>voi
 function BarProductModal({product,onClose,onSave}:{product:Product|null,onClose:()=>void,onSave:(p:Omit<Product,'id'|'active'>,editing?:Product|null)=>void}){
  const[name,setName]=useState(product?.name||''),[description,setDescription]=useState(product?.description||''),[price,setPrice]=useState(product?String(product.price).replace('.',','):''),[photo,setPhoto]=useState(product?.photo||''),[category,setCategory]=useState<Category>(product?.category||'Comidas'),[trackStock,setTrackStock]=useState(product?tracked(product):false),[stock,setStock]=useState(product?String(product.stock):'0')
  return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();if(!name.trim()||!price)return;onSave({name:name.trim(),description:description.trim()||undefined,price:parseMoney(price),photo:photo.trim()||undefined,category,stock:product?product.stock:trackStock?Number(stock)||0:0,trackStock,salesArea:category==='Bebidas'?'ambos':'bar'},product);onClose()}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>{product?'Editar item':'Novo item do bar'}</h2><p>Refeições ficam livres; bebidas podem controlar unidades em estoque.</p><label>Nome<input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Jantinha completa" required/></label><label>Descrição<input value={description} onChange={e=>setDescription(e.target.value)} placeholder="Detalhes do item"/></label><div className="form-row"><label>Preço<input value={price} onChange={e=>setPrice(e.target.value)} placeholder="0,00" inputMode="decimal" required/></label><label>Categoria<select value={category} onChange={e=>setCategory(e.target.value as Category)}><option>Comidas</option><option>Bebidas</option><option>Doses</option></select></label></div><label>Foto <small>(URL opcional nesta fase)</small><input value={photo} onChange={e=>setPhoto(e.target.value)} placeholder="https://..."/></label><label className="check-label"><input type="checkbox" checked={trackStock} onChange={e=>setTrackStock(e.target.checked)}/> Controlar unidades em estoque</label>{trackStock&&<label>Estoque inicial {product&&<small>(altere pela tela Estoque)</small>}<input value={stock} onChange={e=>setStock(e.target.value)} inputMode="numeric" disabled={Boolean(product)}/></label>}<button className="primary" type="submit">{product?'Salvar alterações':'Adicionar ao cardápio'}</button></form></div>
+}
+
+function OpenServiceTabModal({clients,onClose,onSave}:{clients:Client[],onClose:()=>void,onSave:(data:{clientId?:number;name?:string;phone?:string;cpf?:string;mode:OrderMode;table?:string;address?:string;notes?:string})=>void}){
+ const[clientId,setClientId]=useState('new'),[name,setName]=useState(''),[phone,setPhone]=useState(''),[cpf,setCpf]=useState(''),[mode,setMode]=useState<OrderMode>('local'),[table,setTable]=useState(''),[address,setAddress]=useState(''),[notes,setNotes]=useState('')
+ const isNew=clientId==='new'
+ return <div className="modal-backdrop"><form className="modal product-modal service-open-modal" onSubmit={e=>{e.preventDefault();if(isNew&&(!name.trim()||!phone.trim()))return;if(!isNew&&!clientId)return;onSave({clientId:isNew?undefined:Number(clientId),name,phone,cpf,mode,table,address,notes})}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>Abrir comanda</h2><p>Selecione um cliente ou faça o primeiro cadastro sem sair do atendimento.</p><label>Cliente<select value={clientId} onChange={e=>setClientId(e.target.value)}><option value="new">+ Novo cliente</option>{clients.map(c=><option value={c.id} key={c.id}>{c.name} · {c.phone}</option>)}</select></label>{isNew&&<><div className="form-row"><label>Nome<input autoFocus value={name} onChange={e=>setName(e.target.value)} required placeholder="Nome do cliente"/></label><label>Telefone<input value={phone} onChange={e=>setPhone(e.target.value)} required inputMode="tel" placeholder="(62) 99999-9999"/></label></div><label>CPF <small>(opcional)</small><input value={cpf} onChange={e=>setCpf(e.target.value)} inputMode="numeric" placeholder="000.000.000-00"/></label></>}<label>Tipo de atendimento</label><div className="mode-picker">{([['local','Consumo local'],['retirada','Retirada'],['delivery','Delivery']] as [OrderMode,string][]).map(([value,label])=><button type="button" key={value} className={mode===value?'active':''} onClick={()=>setMode(value)}>{label}</button>)}</div>{mode==='local'&&<label>Mesa ou identificação <small>(opcional)</small><input value={table} onChange={e=>setTable(e.target.value)} placeholder="Ex.: 04 ou Balcão"/></label>}{mode==='delivery'&&<label>Endereço de entrega<input value={address} onChange={e=>setAddress(e.target.value)} required placeholder="Rua, número e referência"/></label>}<label>Observação <small>(opcional)</small><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Informação geral da comanda"/></label><button className="primary" type="submit">Abrir e adicionar pedido</button></form></div>
+}
+
+function ServiceTabModal({serviceTab,client,products,onClose,onSend}:{serviceTab:ServiceTab;client?:Client;products:Product[];onClose:()=>void;onSend:(serviceTabId:number,items:TicketItem[])=>void}){
+ const[query,setQuery]=useState(''),[draft,setDraft]=useState<CartItem[]>([]),[notes,setNotes]=useState('')
+ const shown=products.filter(p=>!query||`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()))
+ const details=draft.map(i=>({...i,product:products.find(p=>p.id===i.productId)!})).filter(i=>i.product)
+ const add=(p:Product)=>setDraft(prev=>{const found=prev.find(i=>i.productId===p.id);if(tracked(p)&&(found?.qty||0)>=p.stock)return prev;return found?prev.map(i=>i.productId===p.id?{...i,qty:i.qty+1}:i):[...prev,{productId:p.id,qty:1}]})
+ const change=(p:Product,delta:number)=>setDraft(prev=>prev.map(i=>i.productId===p.id?{...i,qty:Math.max(0,tracked(p)?Math.min(p.stock,i.qty+delta):i.qty+delta)}:i).filter(i=>i.qty>0))
+ const allItems=serviceTab.tickets.flatMap(t=>t.items),total=allItems.reduce((s,i)=>s+i.qty*i.price,0),draftTotal=details.reduce((s,i)=>s+i.qty*i.product.price,0)
+ return <div className="modal-backdrop"><div className="modal service-tab-modal"><button className="modal-x" onClick={onClose}><X/></button><div className="service-modal-heading"><div><span>Comanda #{String(serviceTab.id).padStart(3,'0')}</span><h2>{client?.name}</h2><p>{client?.phone} · {serviceTab.mode==='local'?'Consumo local':serviceTab.mode==='retirada'?'Retirada':'Delivery'}{serviceTab.table?` · Mesa ${serviceTab.table}`:''}</p></div><div><small>Total atual</small><strong>{money(total)}</strong></div></div><div className="service-workspace"><section><div className="search compact"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar no cardápio"/></div><div className="service-product-list">{shown.map(p=><button key={p.id} onClick={()=>add(p)} disabled={tracked(p)&&p.stock<=0}><span><b>{p.name}</b><small>{p.category} · {tracked(p)?`${p.stock} disponíveis`:'Produção livre'}</small></span><strong>{money(p.price)}</strong></button>)}</div></section><aside><h3>Novo pedido</h3>{details.length?<div className="draft-lines">{details.map(i=><div key={i.productId}><span><b>{i.product.name}</b><small>{money(i.product.price*i.qty)}</small></span><div className="qty-control"><button onClick={()=>change(i.product,-1)}>−</button><b>{i.qty}</b><button onClick={()=>change(i.product,1)}>+</button></div></div>)}</div>:<p className="muted">Clique nos itens para montar o pedido.</p>}<label>Observação deste pedido<input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: sem cebola, carne bem passada"/></label><div className="draft-total"><span>Total</span><strong>{money(draftTotal)}</strong></div><button className="primary" disabled={!draft.length} onClick={()=>{onSend(serviceTab.id,details.map(i=>({productId:i.product.id,name:i.product.name,qty:i.qty,price:i.product.price,notes:notes.trim()||undefined})));setDraft([]);setNotes('')}}>Enviar pedido</button></aside></div>{serviceTab.tickets.length>0&&<div className="ticket-history"><h3>Pedidos enviados</h3>{serviceTab.tickets.map(t=><div className="ticket-row" key={t.id}><span><b>Pedido #{String(t.id).padStart(3,'0')}</b><small>{new Date(t.createdAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · Em preparo</small></span><p>{t.items.map(i=>`${i.qty}x ${i.name}`).join(' · ')}</p><strong>{money(t.items.reduce((s,i)=>s+i.qty*i.price,0))}</strong></div>)}</div>}</div></div>
 }

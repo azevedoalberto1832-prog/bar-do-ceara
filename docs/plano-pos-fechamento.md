@@ -36,6 +36,12 @@ Retomar este plano quando o cliente confirmar a contratação e definir:
 4. Fechamento da comanda, pagamento e integração com Caixa e estoque.
 5. Banco central, autenticação, publicação web e operação offline sincronizada.
 
+### Andamento da demo
+
+- fase 1 concluída: cadastro de clientes e cardápio do bar;
+- fase 2 concluída: abertura de comandas por cliente, modalidades de atendimento e múltiplos pedidos separados;
+- próxima fase: painel operacional, andamento da cozinha e ações específicas por modalidade.
+
 ## Etapa 1 — congelar e proteger a demo aprovada
 
 1. Registrar os fluxos aprovados pelo cliente.
