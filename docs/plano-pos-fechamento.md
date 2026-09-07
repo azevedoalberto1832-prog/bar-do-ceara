@@ -14,6 +14,28 @@ Retomar este plano quando o cliente confirmar a contratação e definir:
 - qualidade da internet no local;
 - módulos contratados e cronograma das fases.
 
+## Decisões confirmadas para comandas
+
+- nome e telefone são obrigatórios no cadastro do cliente; CPF é opcional;
+- o telefone identifica e reaproveita o cadastro interno do cliente;
+- vendas de balcão e vendas por comanda são origens diferentes, mas alimentam o mesmo Caixa;
+- a comanda só gera receita quando for paga e fechada;
+- cada envio dentro da comanda cria uma ficha separada para cozinha;
+- a comanda permanece aberta para receber novos pedidos;
+- bebidas controlam unidades em estoque;
+- refeições, porções e preparos ficam como produção livre nesta fase;
+- pedidos podem ser consumo no local, retirada ou delivery;
+- delivery usa o status `Saiu para entrega`;
+- retirada e consumo local usam o status `Pedido pronto`.
+
+## Fases funcionais aprovadas
+
+1. Cadastro de clientes e catálogo específico do bar.
+2. Abertura de comandas, inclusão de itens e múltiplos pedidos por comanda.
+3. Painel de cozinha/atendimento e status por modalidade.
+4. Fechamento da comanda, pagamento e integração com Caixa e estoque.
+5. Banco central, autenticação, publicação web e operação offline sincronizada.
+
 ## Etapa 1 — congelar e proteger a demo aprovada
 
 1. Registrar os fluxos aprovados pelo cliente.

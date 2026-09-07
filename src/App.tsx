@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus } from 'lucide-react'
+import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus, Users, UtensilsCrossed, Phone } from 'lucide-react'
 import './cash.css'
+import './bar.css'
 
 type Category = 'Bebidas' | 'Comidas' | 'Doses' | 'Tabacaria' | 'Outros'
 type Payment = 'Pix' | 'Dinheiro' | 'Débito' | 'Crédito'
-type Product = { id:number; name:string; category:Category; price:number; stock:number; barcode?:string; active:boolean; trackStock?:boolean }
+type SalesArea = 'mercearia'|'bar'|'ambos'
+type Product = { id:number; name:string; category:Category; price:number; stock:number; barcode?:string; active:boolean; trackStock?:boolean; description?:string; photo?:string; salesArea?:SalesArea }
+type Client = { id:number; name:string; phone:string; cpf?:string; createdAt:string }
 type CartItem = { productId:number; qty:number }
 type SaleItem = { productId:number; name:string; qty:number; price:number; trackStock?:boolean }
 type Sale = { id:number; createdAt:string; payment:Payment; total:number; received?:number; change?:number; items:SaleItem[]; canceledAt?:string }
@@ -13,10 +16,22 @@ type StockMovement = { id:number; productId:number; productName:string; kind:Mov
 type CashClosing = { id:number; createdAt:string; opening:number; expected:number; counted:number; difference:number; notes?:string }
 type CashMovement = { id:number; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number }
 type CashRow = { key:string; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number; origin:'Venda'|'Manual'; saleId?:number; manual?:CashMovement }
-type Tab = 'vender'|'historico'|'estoque'|'produtos'|'caixa'|'resumo'
+type Tab = 'vender'|'historico'|'estoque'|'produtos'|'cardapio'|'clientes'|'caixa'|'resumo'
 
 const initialProducts: Product[] = [
 {id:1,name:'Coca-Cola Lata',category:'Bebidas',price:6,stock:24,barcode:'7894900011517',active:true},{id:2,name:'Coca-Cola 2L',category:'Bebidas',price:12,stock:10,barcode:'7894900027013',active:true},{id:3,name:'Guaraná Lata',category:'Bebidas',price:5,stock:18,active:true},{id:4,name:'Água 500ml',category:'Bebidas',price:4,stock:30,active:true},{id:5,name:'Del Valle Uva',category:'Bebidas',price:6,stock:12,active:true},{id:6,name:'Del Valle Pêssego',category:'Bebidas',price:6,stock:10,active:true},{id:7,name:'Energético',category:'Bebidas',price:12,stock:14,active:true},{id:8,name:'Água com Gás',category:'Bebidas',price:5,stock:16,active:true},{id:9,name:'Jantinha Completa',category:'Comidas',price:18,stock:0,active:true,trackStock:false},{id:10,name:'Espetinho Carne',category:'Comidas',price:10,stock:0,active:true,trackStock:false},{id:11,name:'Espetinho Frango',category:'Comidas',price:9,stock:0,active:true,trackStock:false},{id:12,name:'Porção de Batata',category:'Comidas',price:20,stock:0,active:true,trackStock:false},{id:13,name:'Salgado',category:'Comidas',price:7,stock:15,active:true},{id:14,name:'Dose Cachaça',category:'Doses',price:5,stock:0,active:true,trackStock:false},{id:15,name:'Dose Whisky',category:'Doses',price:12,stock:0,active:true,trackStock:false},{id:16,name:'Dose Vodka',category:'Doses',price:9,stock:0,active:true,trackStock:false},{id:17,name:'Dose Campari',category:'Doses',price:10,stock:0,active:true,trackStock:false},{id:18,name:'Palheiro Tradicional',category:'Tabacaria',price:3,stock:50,active:true},{id:19,name:'Palheiro Menta',category:'Tabacaria',price:3.5,stock:35,active:true},{id:20,name:'Isqueiro',category:'Tabacaria',price:6,stock:20,active:true},{id:21,name:'Chiclete',category:'Outros',price:2,stock:40,active:true},{id:22,name:'Paçoca',category:'Outros',price:2.5,stock:25,active:true},{id:23,name:'Gelo 3kg',category:'Outros',price:10,stock:8,active:true},{id:24,name:'Carvão 3kg',category:'Outros',price:18,stock:7,active:true},{id:25,name:'Copo Descartável',category:'Outros',price:1,stock:100,active:true}]
+
+const barSeedProducts: Omit<Product,'id'>[] = [
+ {name:'Almoço do Dia',description:'Prato feito com arroz, feijão, salada e acompanhamento do dia.',category:'Comidas',price:22,stock:0,active:true,trackStock:false,salesArea:'bar'},
+ {name:'Copão de Whisky',description:'Whisky, gelo e energético no copo grande.',category:'Doses',price:18,stock:0,active:true,trackStock:false,salesArea:'bar'},
+ {name:'Porção de Calabresa',description:'Calabresa acebolada para compartilhar.',category:'Comidas',price:28,stock:0,active:true,trackStock:false,salesArea:'bar'},
+ {name:'Porção de Carne de Sol',description:'Carne de sol acebolada com acompanhamento.',category:'Comidas',price:38,stock:0,active:true,trackStock:false,salesArea:'bar'},
+ {name:'Porção de Frango Frito',description:'Frango frito crocante em porção.',category:'Comidas',price:30,stock:0,active:true,trackStock:false,salesArea:'bar'},
+ {name:'Brahma 350ml',description:'Cerveja Brahma em lata gelada.',category:'Bebidas',price:6,stock:24,active:true,trackStock:true,salesArea:'ambos'},
+ {name:'Skol 350ml',description:'Cerveja Skol em lata gelada.',category:'Bebidas',price:6,stock:24,active:true,trackStock:true,salesArea:'ambos'},
+ {name:'Heineken Long Neck',description:'Cerveja Heineken long neck gelada.',category:'Bebidas',price:10,stock:18,active:true,trackStock:true,salesArea:'ambos'},
+ {name:'Guaraná 2L',description:'Refrigerante Guaraná de 2 litros.',category:'Bebidas',price:11,stock:10,active:true,trackStock:true,salesArea:'ambos'}
+]
 
 const money=(v:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v)
 const tracked=(p:Product)=>p.trackStock!==false
@@ -24,9 +39,12 @@ const sameDay=(iso:string,date=new Date())=>new Date(iso).toDateString()===date.
 const parseMoney=(value:string)=>Number(value.replace(/\./g,'').replace(',','.'))||0
 const nextId=(items:{id:number}[])=>Math.max(0,...items.map(i=>i.id))+1
 const loadStorage=<T,>(key:string,fallback:T):T=>{try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch{return fallback}}
+const withBarSeeds=(items:Product[])=>{const names=new Set(items.map(p=>p.name.toLowerCase()));let id=nextId(items);return [...items,...barSeedProducts.filter(p=>!names.has(p.name.toLowerCase())).map(p=>({...p,id:id++}))]}
+const productArea=(p:Product):SalesArea=>p.salesArea||(['Bebidas','Comidas','Doses'].includes(p.category)?'ambos':'mercearia')
 
 export default function App(){
- const [products,setProducts]=useState<Product[]>(()=>loadStorage('bdc_products',initialProducts))
+ const [products,setProducts]=useState<Product[]>(()=>withBarSeeds(loadStorage('bdc_products',initialProducts)))
+ const [clients,setClients]=useState<Client[]>(()=>loadStorage('bdc_clients',[]))
  const [sales,setSales]=useState<Sale[]>(()=>loadStorage('bdc_sales',[]))
  const [movements,setMovements]=useState<StockMovement[]>(()=>loadStorage('bdc_movements',[]))
  const [closings,setClosings]=useState<CashClosing[]>(()=>loadStorage('bdc_closings',[]))
@@ -49,14 +67,19 @@ export default function App(){
  const [cashModal,setCashModal]=useState<CashMovement|null|undefined>(undefined)
  const [cashQuery,setCashQuery]=useState('')
  const [cashType,setCashType]=useState<'todos'|'entrada'|'saida'>('todos')
+ const [clientModal,setClientModal]=useState<Client|null|undefined>(undefined)
+ const [clientQuery,setClientQuery]=useState('')
+ const [barProductModal,setBarProductModal]=useState<Product|null|undefined>(undefined)
+ const [barQuery,setBarQuery]=useState('')
 
  useEffect(()=>localStorage.setItem('bdc_products',JSON.stringify(products)),[products])
  useEffect(()=>localStorage.setItem('bdc_sales',JSON.stringify(sales)),[sales])
  useEffect(()=>localStorage.setItem('bdc_movements',JSON.stringify(movements)),[movements])
  useEffect(()=>localStorage.setItem('bdc_closings',JSON.stringify(closings)),[closings])
  useEffect(()=>localStorage.setItem('bdc_cash_movements',JSON.stringify(cashMovements)),[cashMovements])
+ useEffect(()=>localStorage.setItem('bdc_clients',JSON.stringify(clients)),[clients])
 
- const filtered=useMemo(()=>products.filter(p=>p.active&&(category==='Todos'||p.category===category)&&(!query||p.name.toLowerCase().includes(query.toLowerCase())||p.barcode?.includes(query))),[products,category,query])
+ const filtered=useMemo(()=>products.filter(p=>p.active&&productArea(p)!=='bar'&&(category==='Todos'||p.category===category)&&(!query||p.name.toLowerCase().includes(query.toLowerCase())||p.barcode?.includes(query))),[products,category,query])
  const cartDetails=cart.map(i=>({...i,product:products.find(p=>p.id===i.productId)!})).filter(i=>i.product)
  const total=cartDetails.reduce((s,i)=>s+i.product.price*i.qty,0)
  const activeSales=sales.filter(s=>!s.canceledAt)
@@ -65,6 +88,8 @@ export default function App(){
  const paymentTotals=(['Pix','Dinheiro','Débito','Crédito'] as Payment[]).map(p=>({label:p,value:todaySales.filter(s=>s.payment===p).reduce((a,b)=>a+b.total,0)}))
  const topProducts=useMemo(()=>{const m=new Map<string,number>();todaySales.flatMap(s=>s.items).forEach(i=>m.set(i.name,(m.get(i.name)||0)+i.qty));return[...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5)},[todaySales])
  const stockProducts=[...products.filter(p=>p.active)].sort((a,b)=>b.id-a.id)
+ const barProducts=useMemo(()=>products.filter(p=>p.active&&productArea(p)!=='mercearia'&&(!barQuery||`${p.name} ${p.description||''} ${p.category}`.toLowerCase().includes(barQuery.toLowerCase()))),[products,barQuery])
+ const filteredClients=useMemo(()=>clients.filter(c=>!clientQuery||`${c.name} ${c.phone} ${c.cpf||''}`.toLowerCase().includes(clientQuery.toLowerCase())),[clients,clientQuery])
  const receivedNumber=parseMoney(received)
  const change=Math.max(0,receivedNumber-total)
  const lowStock=products.filter(p=>p.active&&tracked(p)&&p.stock<=5)
@@ -137,7 +162,7 @@ export default function App(){
    if(data.barcode&&products.some(p=>p.barcode===data.barcode&&p.id!==editing?.id)){alert('Este código de barras já está vinculado a outro produto.');return}
    if(editing){setProducts(prev=>prev.map(p=>p.id===editing.id?{...p,...data}:p));setProductModal(undefined);return}
    const id=nextId(products);const product:Product={...data,id,active:true}
-   setProducts(prev=>[...prev,product]);setLastCreatedId(id);setProductModal(undefined);setTab('estoque')
+   setProducts(prev=>[...prev,product]);setLastCreatedId(id);setProductModal(undefined);if(!data.salesArea)setTab('estoque')
    if(tracked(product)&&product.stock>0)addMovement(product,'Cadastro',product.stock,'Estoque inicial do cadastro')
  }
  const deactivateProduct=(p:Product)=>{const used=sales.some(s=>s.items.some(i=>i.productId===p.id));if(used)setProducts(x=>x.map(v=>v.id===p.id?{...v,active:false}:v));else setProducts(x=>x.filter(v=>v.id!==p.id))}
@@ -150,6 +175,13 @@ export default function App(){
  const deleteCashMovement=(movement:CashMovement)=>{
    if(!confirm(`Excluir o lançamento "${movement.description}"?`))return
    setCashMovements(prev=>prev.filter(m=>m.id!==movement.id))
+ }
+ const saveClient=(data:Omit<Client,'id'|'createdAt'>,editing?:Client|null)=>{
+   const phone=data.phone.replace(/\D/g,'')
+   if(clients.some(c=>c.phone.replace(/\D/g,'')===phone&&c.id!==editing?.id)){alert('Já existe um cliente cadastrado com este telefone.');return}
+   if(editing)setClients(prev=>prev.map(c=>c.id===editing.id?{...c,...data}:c))
+   else setClients(prev=>[{...data,id:nextId(prev),createdAt:new Date().toISOString()},...prev])
+   setClientModal(undefined)
  }
 
  const filteredSales=useMemo(()=>sales.filter(s=>{
@@ -165,6 +197,8 @@ export default function App(){
       <Nav icon={<History size={20}/>} label="Histórico" active={tab==='historico'} onClick={()=>setTab('historico')}/>
       <Nav icon={<Boxes size={20}/>} label="Estoque" active={tab==='estoque'} onClick={()=>setTab('estoque')}/>
       <Nav icon={<PackagePlus size={20}/>} label="Produtos" active={tab==='produtos'} onClick={()=>setTab('produtos')}/>
+      <Nav icon={<UtensilsCrossed size={20}/>} label="Cardápio bar" active={tab==='cardapio'} onClick={()=>setTab('cardapio')}/>
+      <Nav icon={<Users size={20}/>} label="Clientes" active={tab==='clientes'} onClick={()=>setTab('clientes')}/>
       <Nav icon={<Landmark size={20}/>} label="Caixa" active={tab==='caixa'} onClick={()=>setTab('caixa')}/>
       <Nav icon={<BarChart3 size={20}/>} label="Resumo" active={tab==='resumo'} onClick={()=>setTab('resumo')}/>
     </nav>
@@ -203,6 +237,16 @@ export default function App(){
       <div className="table-card"><table><thead><tr><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Código</th><th>Status</th><th></th></tr></thead><tbody>{products.map(p=><tr key={p.id} className={!p.active?'row-muted':''}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{money(p.price)}</td><td>{tracked(p)?p.stock:'Livre'}</td><td>{p.barcode||'Manual'}</td><td>{p.active?<span className="status-ok">Ativo</span>:<span className="status-canceled">Inativo</span>}</td><td><div className="row-actions"><button className="icon-btn" onClick={()=>setProductModal(p)} title="Editar"><Pencil size={17}/></button>{p.active?<button className="icon-danger" onClick={()=>deactivateProduct(p)} title="Desativar"><Trash2 size={17}/></button>:<button className="icon-btn" onClick={()=>reactivateProduct(p)} title="Reativar"><RotateCcw size={17}/></button>}</div></td></tr>)}</tbody></table></div>
     </Section>}
 
+    {tab==='cardapio'&&<Section title="Cardápio do bar" subtitle="Refeições, porções e bebidas que serão usadas nas comandas." action={<button className="primary small" onClick={()=>setBarProductModal(null)}><Plus size={17}/> Novo item</button>}>
+      <div className="toolbar"><div className="search compact"><Search size={18}/><input value={barQuery} onChange={e=>setBarQuery(e.target.value)} placeholder="Buscar no cardápio"/></div><span className="muted">{barProducts.length} itens ativos</span></div>
+      <div className="bar-product-grid">{barProducts.map(p=><article className="bar-product-card" key={p.id}>{p.photo?<img src={p.photo} alt=""/>:<div className="bar-product-placeholder"><UtensilsCrossed size={28}/></div>}<div><span className="product-category">{p.category}</span><h3>{p.name}</h3><p>{p.description||'Item disponível no atendimento do bar.'}</p><div className="bar-product-footer"><strong>{money(p.price)}</strong><small>{tracked(p)?`${p.stock} em estoque`:'Produção livre'}</small></div><button className="secondary" onClick={()=>setBarProductModal(p)}><Pencil size={15}/> Editar</button></div></article>)}</div>
+    </Section>}
+
+    {tab==='clientes'&&<Section title="Clientes" subtitle="O cadastro será criado automaticamente na primeira abertura de comanda." action={<button className="primary small" onClick={()=>setClientModal(null)}><Plus size={17}/> Novo cliente</button>}>
+      <div className="toolbar"><div className="search compact"><Search size={18}/><input value={clientQuery} onChange={e=>setClientQuery(e.target.value)} placeholder="Buscar nome, telefone ou CPF"/></div><span className="muted">{clients.length} clientes</span></div>
+      <div className="table-card"><table><thead><tr><th>Cliente</th><th>Telefone</th><th>CPF</th><th>Cadastro</th><th></th></tr></thead><tbody>{filteredClients.map(c=><tr key={c.id}><td><strong>{c.name}</strong></td><td><span className="client-phone"><Phone size={15}/>{c.phone}</span></td><td>{c.cpf||<span className="muted">Não informado</span>}</td><td>{new Date(c.createdAt).toLocaleDateString('pt-BR')}</td><td><button className="icon-btn" onClick={()=>setClientModal(c)} title="Editar cliente"><Pencil size={17}/></button></td></tr>)}</tbody></table>{!filteredClients.length&&<div className="empty-table">Nenhum cliente encontrado.</div>}</div>
+    </Section>}
+
     {tab==='caixa'&&<Section title="Caixa" subtitle="Entradas e saídas em uma visão de planilha, com vendas integradas automaticamente." action={<button className="primary small" onClick={()=>setCashModal(null)}><Plus size={17}/> Novo lançamento</button>}>
       <div className="cash-summary"><div><span>Entradas</span><strong className="good">{money(cashTotals.entrada)}</strong></div><div><span>Saídas</span><strong className="bad">{money(cashTotals.saida)}</strong></div><div><span>Saldo geral</span><strong>{money(cashTotals.entrada-cashTotals.saida)}</strong></div><div><span>Saldo de hoje</span><strong>{money(todayCashBalance)}</strong></div></div>
       <div className="toolbar cash-toolbar"><div className="search compact"><Search size={18}/><input value={cashQuery} onChange={e=>setCashQuery(e.target.value)} placeholder="Buscar descrição, categoria ou pagamento"/></div><select value={cashType} onChange={e=>setCashType(e.target.value as typeof cashType)}><option value="todos">Todas</option><option value="entrada">Entradas</option><option value="saida">Saídas</option></select></div>
@@ -224,6 +268,8 @@ export default function App(){
    {saleModal&&<SaleModal sale={saleModal} onClose={()=>setSaleModal(null)} onCancel={cancelSale}/>} 
    {closingOpen&&<ClosingModal cashSales={todayPhysicalCash} onClose={()=>setClosingOpen(false)} onSave={(opening,counted,notes)=>{const expected=opening+todayPhysicalCash;setClosings(prev=>[{id:nextId(prev),createdAt:new Date().toISOString(),opening,expected,counted,difference:counted-expected,notes},...prev]);setClosingOpen(false)}}/>}
    {cashModal!==undefined&&<CashMovementModal movement={cashModal} onClose={()=>setCashModal(undefined)} onSave={saveCashMovement}/>}
+   {clientModal!==undefined&&<ClientModal client={clientModal} onClose={()=>setClientModal(undefined)} onSave={saveClient}/>}
+   {barProductModal!==undefined&&<BarProductModal product={barProductModal} onClose={()=>setBarProductModal(undefined)} onSave={saveProduct}/>}
  </div>
 }
 
@@ -255,4 +301,14 @@ function ClosingModal({cashSales,onClose,onSave}:{cashSales:number,onClose:()=>v
 function CashMovementModal({movement,onClose,onSave}:{movement:CashMovement|null,onClose:()=>void,onSave:(data:Omit<CashMovement,'id'>,editing?:CashMovement|null)=>void}){
  const[type,setType]=useState<'entrada'|'saida'>(movement?.type||'saida'),[description,setDescription]=useState(movement?.description||''),[category,setCategory]=useState(movement?.category||''),[payment,setPayment]=useState<Payment|'Outro'>(movement?.payment||'Dinheiro'),[amount,setAmount]=useState(movement?String(movement.amount).replace('.',','):''),[date,setDate]=useState(()=>{const d=movement?new Date(movement.createdAt):new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)})
  return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();const value=parseMoney(amount);if(!description.trim()||!value)return;onSave({type,description:description.trim(),category:category.trim()||'Outros',payment,amount:value,createdAt:new Date(date).toISOString()},movement)}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>{movement?'Editar lançamento':'Novo lançamento'}</h2><p>Controle total para registrar receitas, compras, despesas, sangrias e ajustes.</p><div className="switch"><button type="button" className={type==='entrada'?'active cash-entry-button':''} onClick={()=>setType('entrada')}>Entrada</button><button type="button" className={type==='saida'?'active cash-exit-button':''} onClick={()=>setType('saida')}>Saída</button></div><label>Descrição<input autoFocus value={description} onChange={e=>setDescription(e.target.value)} placeholder="Ex.: compra de bebidas, conta de luz" required/></label><div className="form-row"><label>Categoria<input value={category} onChange={e=>setCategory(e.target.value)} placeholder="Ex.: Fornecedor, Despesa"/></label><label>Valor<input value={amount} onChange={e=>setAmount(e.target.value)} inputMode="decimal" placeholder="0,00" required/></label></div><div className="form-row"><label>Pagamento<select value={payment} onChange={e=>setPayment(e.target.value as Payment|'Outro')}>{['Dinheiro','Pix','Débito','Crédito','Outro'].map(p=><option key={p}>{p}</option>)}</select></label><label>Data e hora<input type="datetime-local" value={date} onChange={e=>setDate(e.target.value)} required/></label></div><button className="primary" type="submit">{movement?'Salvar alterações':'Adicionar ao caixa'}</button></form></div>
+}
+
+function ClientModal({client,onClose,onSave}:{client:Client|null,onClose:()=>void,onSave:(data:Omit<Client,'id'|'createdAt'>,editing?:Client|null)=>void}){
+ const[name,setName]=useState(client?.name||''),[phone,setPhone]=useState(client?.phone||''),[cpf,setCpf]=useState(client?.cpf||'')
+ return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();if(!name.trim()||!phone.trim())return;onSave({name:name.trim(),phone:phone.trim(),cpf:cpf.trim()||undefined},client)}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>{client?'Editar cliente':'Novo cliente'}</h2><p>Nome e telefone identificam a comanda. CPF é opcional.</p><label>Nome completo<input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="Nome do cliente" required/></label><label>Telefone<input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="(62) 99999-9999" inputMode="tel" required/></label><label>CPF <small>(opcional)</small><input value={cpf} onChange={e=>setCpf(e.target.value)} placeholder="000.000.000-00" inputMode="numeric"/></label><button className="primary" type="submit">{client?'Salvar alterações':'Cadastrar cliente'}</button></form></div>
+}
+
+function BarProductModal({product,onClose,onSave}:{product:Product|null,onClose:()=>void,onSave:(p:Omit<Product,'id'|'active'>,editing?:Product|null)=>void}){
+ const[name,setName]=useState(product?.name||''),[description,setDescription]=useState(product?.description||''),[price,setPrice]=useState(product?String(product.price).replace('.',','):''),[photo,setPhoto]=useState(product?.photo||''),[category,setCategory]=useState<Category>(product?.category||'Comidas'),[trackStock,setTrackStock]=useState(product?tracked(product):false),[stock,setStock]=useState(product?String(product.stock):'0')
+ return <div className="modal-backdrop"><form className="modal product-modal" onSubmit={e=>{e.preventDefault();if(!name.trim()||!price)return;onSave({name:name.trim(),description:description.trim()||undefined,price:parseMoney(price),photo:photo.trim()||undefined,category,stock:product?product.stock:trackStock?Number(stock)||0:0,trackStock,salesArea:category==='Bebidas'?'ambos':'bar'},product);onClose()}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>{product?'Editar item':'Novo item do bar'}</h2><p>Refeições ficam livres; bebidas podem controlar unidades em estoque.</p><label>Nome<input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="Ex.: Jantinha completa" required/></label><label>Descrição<input value={description} onChange={e=>setDescription(e.target.value)} placeholder="Detalhes do item"/></label><div className="form-row"><label>Preço<input value={price} onChange={e=>setPrice(e.target.value)} placeholder="0,00" inputMode="decimal" required/></label><label>Categoria<select value={category} onChange={e=>setCategory(e.target.value as Category)}><option>Comidas</option><option>Bebidas</option><option>Doses</option></select></label></div><label>Foto <small>(URL opcional nesta fase)</small><input value={photo} onChange={e=>setPhoto(e.target.value)} placeholder="https://..."/></label><label className="check-label"><input type="checkbox" checked={trackStock} onChange={e=>setTrackStock(e.target.checked)}/> Controlar unidades em estoque</label>{trackStock&&<label>Estoque inicial {product&&<small>(altere pela tela Estoque)</small>}<input value={stock} onChange={e=>setStock(e.target.value)} inputMode="numeric" disabled={Boolean(product)}/></label>}<button className="primary" type="submit">{product?'Salvar alterações':'Adicionar ao cardápio'}</button></form></div>
 }
