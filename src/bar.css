@@ -56,9 +56,9 @@
 .mode-picker { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:-5px 0 16px; }
 .mode-picker button { padding:11px 8px; border:1px solid #d9d7cf; border-radius:10px; background:#fff; }
 .mode-picker button.active { color:#fff; background:#1c4d3c; border-color:#1c4d3c; }
-.modal-backdrop:has(> .service-tab-modal) { padding:0; }
-.service-tab-modal {
-  width:100vw;
+.modal-backdrop:has(> .service-tab-modal) { left:230px; padding:0; background:#f4f1e9; }
+.modal.service-tab-modal {
+  width:100%;
   max-width:none;
   height:100vh;
   max-height:none;
@@ -81,7 +81,7 @@
 .service-workspace > section,.service-workspace > aside { min-height:0; padding:15px; border:1px solid #e4e0d8; border-radius:14px; background:#faf9f6; overflow:auto; }
 .service-workspace > section { display:flex; flex-direction:column; }
 .service-workspace > aside h3 { margin-top:0; }
-.service-product-list { display:grid; grid-template-columns:repeat(3,minmax(190px,1fr)); gap:8px; flex:1; align-content:start; max-height:none; margin-top:12px; overflow:auto; }
+.service-product-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:8px; flex:1; align-content:start; max-height:none; margin-top:12px; overflow:auto; }
 .service-product-list > button { display:flex; justify-content:space-between; gap:8px; padding:12px; text-align:left; border:1px solid #e0ddd6; border-radius:10px; background:#fff; }
 .service-product-list > button span,.draft-lines span,.ticket-row span { display:flex; flex-direction:column; gap:3px; }
 .service-product-list small,.draft-lines small,.ticket-row small { color:#7a817c; font-size:11px; }
@@ -139,7 +139,8 @@
 }
 
 @media (max-width: 800px) {
-  .service-tab-modal { width:100vw; height:100vh; padding:18px; overflow:auto; }
+  .modal-backdrop:has(> .service-tab-modal) { left:0; }
+  .modal.service-tab-modal { width:100vw; height:100vh; padding:18px; overflow:auto; }
   .service-workspace { grid-template-columns:1fr; }
   .service-product-list { grid-template-columns:1fr; }
   .ticket-row { grid-template-columns:1fr; }
