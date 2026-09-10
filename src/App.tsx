@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus, Users, UtensilsCrossed, Phone, ClipboardList, MapPin } from 'lucide-react'
+import { BarChart3, Boxes, BrainCircuit, History, PackagePlus, Search, ShoppingCart, Trash2, X, Pencil, RotateCcw, WalletCards, ArrowDownToLine, ArrowUpFromLine, Eye, Landmark, Plus, Users, UtensilsCrossed, Phone, ClipboardList, MapPin, ChefHat, Bike, CheckCircle2, Clock3 } from 'lucide-react'
 import './cash.css'
 import './bar.css'
 
@@ -9,18 +9,19 @@ type SalesArea = 'mercearia'|'bar'|'ambos'
 type Product = { id:number; name:string; category:Category; price:number; stock:number; barcode?:string; active:boolean; trackStock?:boolean; description?:string; photo?:string; salesArea?:SalesArea }
 type Client = { id:number; name:string; phone:string; cpf?:string; createdAt:string }
 type OrderMode = 'local'|'retirada'|'delivery'
-type TicketItem = { productId:number; name:string; qty:number; price:number; notes?:string }
-type KitchenTicket = { id:number; createdAt:string; status:'preparo'; items:TicketItem[] }
-type ServiceTab = { id:number; clientId:number; mode:OrderMode; table?:string; address?:string; notes?:string; createdAt:string; tickets:KitchenTicket[]; status:'aberta' }
+type TicketStatus = 'preparo'|'pronto'|'entrega'|'concluido'|'cancelado'
+type TicketItem = { productId:number; name:string; qty:number; price:number; trackStock?:boolean; notes?:string }
+type KitchenTicket = { id:number; createdAt:string; status:TicketStatus; items:TicketItem[]; stockReserved?:boolean; updatedAt?:string }
+type ServiceTab = { id:number; clientId:number; mode:OrderMode; table?:string; address?:string; notes?:string; createdAt:string; tickets:KitchenTicket[]; status:'aberta'|'fechada'; closedAt?:string; saleId?:number }
 type CartItem = { productId:number; qty:number }
 type SaleItem = { productId:number; name:string; qty:number; price:number; trackStock?:boolean }
-type Sale = { id:number; createdAt:string; payment:Payment; total:number; received?:number; change?:number; items:SaleItem[]; canceledAt?:string }
+type Sale = { id:number; createdAt:string; payment:Payment; total:number; received?:number; change?:number; items:SaleItem[]; origin?:'balcao'|'comanda'; serviceTabId?:number; clientId?:number; mode?:OrderMode; canceledAt?:string }
 type MovementKind = 'Venda' | 'Entrada' | 'Saída' | 'Ajuste' | 'Cancelamento' | 'Cadastro'
 type StockMovement = { id:number; productId:number; productName:string; kind:MovementKind; qty:number; createdAt:string; note?:string; saleId?:number }
 type CashClosing = { id:number; createdAt:string; opening:number; expected:number; counted:number; difference:number; notes?:string }
 type CashMovement = { id:number; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number }
 type CashRow = { key:string; createdAt:string; type:'entrada'|'saida'; description:string; category:string; payment:Payment|'Outro'; amount:number; origin:'Venda'|'Manual'; saleId?:number; manual?:CashMovement }
-type Tab = 'vender'|'comandas'|'historico'|'estoque'|'produtos'|'cardapio'|'clientes'|'caixa'|'resumo'
+type Tab = 'vender'|'comandas'|'cozinha'|'delivery'|'historico'|'estoque'|'produtos'|'cardapio'|'clientes'|'caixa'|'resumo'
 
 const initialProducts: Product[] = [
 {id:1,name:'Coca-Cola Lata',category:'Bebidas',price:6,stock:24,barcode:'7894900011517',active:true},{id:2,name:'Coca-Cola 2L',category:'Bebidas',price:12,stock:10,barcode:'7894900027013',active:true},{id:3,name:'Guaraná Lata',category:'Bebidas',price:5,stock:18,active:true},{id:4,name:'Água 500ml',category:'Bebidas',price:4,stock:30,active:true},{id:5,name:'Del Valle Uva',category:'Bebidas',price:6,stock:12,active:true},{id:6,name:'Del Valle Pêssego',category:'Bebidas',price:6,stock:10,active:true},{id:7,name:'Energético',category:'Bebidas',price:12,stock:14,active:true},{id:8,name:'Água com Gás',category:'Bebidas',price:5,stock:16,active:true},{id:9,name:'Jantinha Completa',category:'Comidas',price:18,stock:0,active:true,trackStock:false},{id:10,name:'Espetinho Carne',category:'Comidas',price:10,stock:0,active:true,trackStock:false},{id:11,name:'Espetinho Frango',category:'Comidas',price:9,stock:0,active:true,trackStock:false},{id:12,name:'Porção de Batata',category:'Comidas',price:20,stock:0,active:true,trackStock:false},{id:13,name:'Salgado',category:'Comidas',price:7,stock:15,active:true},{id:14,name:'Dose Cachaça',category:'Doses',price:5,stock:0,active:true,trackStock:false},{id:15,name:'Dose Whisky',category:'Doses',price:12,stock:0,active:true,trackStock:false},{id:16,name:'Dose Vodka',category:'Doses',price:9,stock:0,active:true,trackStock:false},{id:17,name:'Dose Campari',category:'Doses',price:10,stock:0,active:true,trackStock:false},{id:18,name:'Palheiro Tradicional',category:'Tabacaria',price:3,stock:50,active:true},{id:19,name:'Palheiro Menta',category:'Tabacaria',price:3.5,stock:35,active:true},{id:20,name:'Isqueiro',category:'Tabacaria',price:6,stock:20,active:true},{id:21,name:'Chiclete',category:'Outros',price:2,stock:40,active:true},{id:22,name:'Paçoca',category:'Outros',price:2.5,stock:25,active:true},{id:23,name:'Gelo 3kg',category:'Outros',price:10,stock:8,active:true},{id:24,name:'Carvão 3kg',category:'Outros',price:18,stock:7,active:true},{id:25,name:'Copo Descartável',category:'Outros',price:1,stock:100,active:true}]
@@ -79,6 +80,7 @@ export default function App(){
  const [serviceTabModal,setServiceTabModal]=useState(false)
  const [activeServiceTab,setActiveServiceTab]=useState<ServiceTab|null>(null)
  const [serviceQuery,setServiceQuery]=useState('')
+ const [closingServiceTab,setClosingServiceTab]=useState<ServiceTab|null>(null)
 
  useEffect(()=>localStorage.setItem('bdc_products',JSON.stringify(products)),[products])
  useEffect(()=>localStorage.setItem('bdc_sales',JSON.stringify(sales)),[sales])
@@ -99,13 +101,15 @@ export default function App(){
  const stockProducts=[...products.filter(p=>p.active)].sort((a,b)=>b.id-a.id)
  const barProducts=useMemo(()=>products.filter(p=>p.active&&productArea(p)!=='mercearia'&&(!barQuery||`${p.name} ${p.description||''} ${p.category}`.toLowerCase().includes(barQuery.toLowerCase()))),[products,barQuery])
  const filteredClients=useMemo(()=>clients.filter(c=>!clientQuery||`${c.name} ${c.phone} ${c.cpf||''}`.toLowerCase().includes(clientQuery.toLowerCase())),[clients,clientQuery])
- const filteredServiceTabs=useMemo(()=>serviceTabs.filter(t=>{const c=clients.find(x=>x.id===t.clientId);return !serviceQuery||`${c?.name||''} ${c?.phone||''} ${t.id} ${t.table||''}`.toLowerCase().includes(serviceQuery.toLowerCase())}),[serviceTabs,clients,serviceQuery])
+ const openServiceTabs=serviceTabs.filter(t=>t.status==='aberta')
+ const filteredServiceTabs=useMemo(()=>serviceTabs.filter(t=>t.status==='aberta').filter(t=>{const c=clients.find(x=>x.id===t.clientId);return !serviceQuery||`${c?.name||''} ${c?.phone||''} ${t.id} ${t.table||''}`.toLowerCase().includes(serviceQuery.toLowerCase())}),[serviceTabs,clients,serviceQuery])
+ const operationalTickets=useMemo(()=>serviceTabs.flatMap(serviceTab=>serviceTab.tickets.map(ticket=>({serviceTab,ticket,client:clients.find(c=>c.id===serviceTab.clientId)}))).sort((a,b)=>new Date(a.ticket.createdAt).getTime()-new Date(b.ticket.createdAt).getTime()),[serviceTabs,clients])
  const receivedNumber=parseMoney(received)
  const change=Math.max(0,receivedNumber-total)
  const lowStock=products.filter(p=>p.active&&tracked(p)&&p.stock<=5)
  const latestClosing=[...closings].sort((a,b)=>b.id-a.id)[0]
  const cashRows=useMemo<CashRow[]>(()=>[
-   ...activeSales.map(s=>({key:`sale-${s.id}`,createdAt:s.createdAt,type:'entrada' as const,description:`Venda #${String(s.id).padStart(4,'0')}`,category:'Vendas',payment:s.payment,amount:s.total,origin:'Venda' as const,saleId:s.id})),
+   ...activeSales.map(s=>({key:`sale-${s.id}`,createdAt:s.createdAt,type:'entrada' as const,description:s.origin==='comanda'?`Comanda #${String(s.serviceTabId).padStart(3,'0')} · Venda #${String(s.id).padStart(4,'0')}`:`Venda #${String(s.id).padStart(4,'0')}`,category:s.origin==='comanda'?'Bar/Comanda':'Mercearia',payment:s.payment,amount:s.total,origin:'Venda' as const,saleId:s.id})),
    ...cashMovements.map(m=>({key:`manual-${m.id}`,...m,origin:'Manual' as const,manual:m}))
  ].sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()),[activeSales,cashMovements])
  const filteredCashRows=useMemo(()=>cashRows.filter(r=>{
@@ -143,7 +147,7 @@ export default function App(){
    if(!cart.length||saleLock.current)return
    saleLock.current=true
    const saleId=nextId(sales)
-   const sale:Sale={id:saleId,createdAt:new Date().toISOString(),payment,total,received:cash,change:cash!==undefined?cash-total:undefined,items:cartDetails.map(i=>({productId:i.product.id,name:i.product.name,qty:i.qty,price:i.product.price,trackStock:i.product.trackStock}))}
+   const sale:Sale={id:saleId,createdAt:new Date().toISOString(),payment,total,received:cash,change:cash!==undefined?cash-total:undefined,origin:'balcao',items:cartDetails.map(i=>({productId:i.product.id,name:i.product.name,qty:i.qty,price:i.product.price,trackStock:i.product.trackStock}))}
    setSales(prev=>[sale,...prev])
    setProducts(prev=>prev.map(p=>{const i=cart.find(x=>x.productId===p.id);return i&&tracked(p)?{...p,stock:Math.max(0,p.stock-i.qty)}:p}))
    cartDetails.filter(i=>tracked(i.product)).forEach(i=>addMovement(i.product,'Venda',-i.qty,`Venda #${String(saleId).padStart(4,'0')}`,saleId))
@@ -205,9 +209,30 @@ export default function App(){
    setServiceTabs(prev=>[serviceTab,...prev]);setServiceTabModal(false);setActiveServiceTab(serviceTab)
  }
  const sendKitchenTicket=(serviceTabId:number,items:TicketItem[])=>{
-   const ticket:KitchenTicket={id:Math.max(0,...serviceTabs.flatMap(t=>t.tickets.map(x=>x.id)))+1,createdAt:new Date().toISOString(),status:'preparo',items}
+   const normalized=items.map(i=>({...i,trackStock:products.find(p=>p.id===i.productId)?.trackStock}))
+   if(normalized.some(i=>{const p=products.find(x=>x.id===i.productId);return p&&tracked(p)&&p.stock<i.qty})){alert('Um dos itens não possui estoque suficiente. Atualize o pedido.');return false}
+   const ticket:KitchenTicket={id:Math.max(0,...serviceTabs.flatMap(t=>t.tickets.map(x=>x.id)))+1,createdAt:new Date().toISOString(),status:'preparo',items:normalized,stockReserved:true}
    setServiceTabs(prev=>prev.map(t=>t.id===serviceTabId?{...t,tickets:[...t.tickets,ticket]}:t))
    setActiveServiceTab(prev=>prev?.id===serviceTabId?{...prev,tickets:[...prev.tickets,ticket]}:prev)
+   setProducts(prev=>prev.map(p=>{const item=normalized.find(i=>i.productId===p.id);return item&&tracked(p)?{...p,stock:p.stock-item.qty}:p}))
+   normalized.forEach(i=>{const p=products.find(x=>x.id===i.productId);if(p&&tracked(p))addMovement(p,'Saída',-i.qty,`Reserva da comanda #${String(serviceTabId).padStart(3,'0')} · pedido #${String(ticket.id).padStart(3,'0')}`)})
+   return true
+ }
+ const updateTicketStatus=(serviceTabId:number,ticketId:number,status:TicketStatus)=>setServiceTabs(prev=>prev.map(t=>t.id===serviceTabId?{...t,tickets:t.tickets.map(x=>x.id===ticketId?{...x,status,updatedAt:new Date().toISOString()}:x)}:t))
+ const cancelTicket=(serviceTabId:number,ticket:KitchenTicket)=>{
+   if(ticket.status==='cancelado'||!confirm(`Cancelar o pedido #${String(ticket.id).padStart(3,'0')} e devolver os itens ao estoque?`))return
+   if(ticket.stockReserved){setProducts(prev=>prev.map(p=>{const item=ticket.items.find(i=>i.productId===p.id);return item&&tracked(p)?{...p,stock:p.stock+item.qty}:p}));ticket.items.forEach(i=>{const p=products.find(x=>x.id===i.productId);if(p&&tracked(p))addMovement(p,'Cancelamento',i.qty,`Pedido #${String(ticket.id).padStart(3,'0')} da comanda #${String(serviceTabId).padStart(3,'0')}`)})}
+   updateTicketStatus(serviceTabId,ticket.id,'cancelado')
+ }
+ const closeServiceTab=(serviceTab:ServiceTab,payment:Payment,cash?:number)=>{
+   const items=serviceTab.tickets.filter(t=>t.status!=='cancelado').flatMap(t=>t.items)
+   if(!items.length)return
+   const saleId=nextId(sales),total=items.reduce((s,i)=>s+i.qty*i.price,0),now=new Date().toISOString()
+   const unreserved=serviceTab.tickets.filter(t=>t.status!=='cancelado'&&!t.stockReserved).flatMap(t=>t.items)
+   setProducts(prev=>prev.map(p=>{const qty=unreserved.filter(i=>i.productId===p.id).reduce((s,i)=>s+i.qty,0);return qty&&tracked(p)?{...p,stock:Math.max(0,p.stock-qty)}:p}))
+   unreserved.forEach(i=>{const p=products.find(x=>x.id===i.productId);if(p&&tracked(p))addMovement(p,'Venda',-i.qty,`Fechamento da comanda #${String(serviceTab.id).padStart(3,'0')}`,saleId)})
+   const sale:Sale={id:saleId,createdAt:now,payment,total,received:cash,change:cash!==undefined?cash-total:undefined,origin:'comanda',serviceTabId:serviceTab.id,clientId:serviceTab.clientId,mode:serviceTab.mode,items:items.map(i=>({productId:i.productId,name:i.name,qty:i.qty,price:i.price,trackStock:i.trackStock}))}
+   setSales(prev=>[sale,...prev]);setServiceTabs(prev=>prev.map(t=>t.id===serviceTab.id?{...t,status:'fechada',closedAt:now,saleId}:t));setClosingServiceTab(null);setActiveServiceTab(null)
  }
 
  const filteredSales=useMemo(()=>sales.filter(s=>{
@@ -217,10 +242,12 @@ export default function App(){
 
  return <div className="app-shell">
    <aside className="sidebar">
-    <div className="brand"><span>BC</span><div><strong>Bar do Ceará</strong><small>PDV local · V0.4</small></div></div>
+    <div className="brand"><span>BC</span><div><strong>Bar do Ceará</strong><small>Gestão integrada · V0.5</small></div></div>
     <nav>
       <Nav icon={<ShoppingCart size={20}/>} label="Vender" active={tab==='vender'} onClick={()=>setTab('vender')}/>
       <Nav icon={<ClipboardList size={20}/>} label="Comandas" active={tab==='comandas'} onClick={()=>setTab('comandas')}/>
+      <Nav icon={<ChefHat size={20}/>} label="Cozinha" active={tab==='cozinha'} onClick={()=>setTab('cozinha')}/>
+      <Nav icon={<Bike size={20}/>} label="Delivery" active={tab==='delivery'} onClick={()=>setTab('delivery')}/>
       <Nav icon={<History size={20}/>} label="Histórico" active={tab==='historico'} onClick={()=>setTab('historico')}/>
       <Nav icon={<Boxes size={20}/>} label="Estoque" active={tab==='estoque'} onClick={()=>setTab('estoque')}/>
       <Nav icon={<PackagePlus size={20}/>} label="Produtos" active={tab==='produtos'} onClick={()=>setTab('produtos')}/>
@@ -250,14 +277,27 @@ export default function App(){
     </>}
 
     {tab==='comandas'&&<Section title="Comandas" subtitle="Atendimento por cliente com vários pedidos na mesma conta." action={<button className="primary small" onClick={()=>setServiceTabModal(true)}><Plus size={17}/> Abrir comanda</button>}>
-      <div className="toolbar"><div className="search compact"><Search size={18}/><input value={serviceQuery} onChange={e=>setServiceQuery(e.target.value)} placeholder="Buscar cliente, telefone, mesa ou número"/></div><span className="muted">{serviceTabs.length} abertas</span></div>
-      <div className="service-tab-grid">{filteredServiceTabs.map(t=>{const client=clients.find(c=>c.id===t.clientId);const itemCount=t.tickets.flatMap(x=>x.items).reduce((s,i)=>s+i.qty,0);const tabTotal=t.tickets.flatMap(x=>x.items).reduce((s,i)=>s+i.qty*i.price,0);return <button className="service-tab-card" key={t.id} onClick={()=>setActiveServiceTab(t)}><div className="service-tab-top"><span>Comanda #{String(t.id).padStart(3,'0')}</span><b>{t.mode==='local'?'Consumo local':t.mode==='retirada'?'Retirada':'Delivery'}</b></div><h3>{client?.name||'Cliente'}</h3><p><Phone size={14}/>{client?.phone}</p>{t.table&&<p><MapPin size={14}/>Mesa {t.table}</p>}<div className="service-tab-bottom"><span>{t.tickets.length} pedido{t.tickets.length===1?'':'s'} · {itemCount} itens</span><strong>{money(tabTotal)}</strong></div></button>})}</div>
+      <div className="toolbar"><div className="search compact"><Search size={18}/><input value={serviceQuery} onChange={e=>setServiceQuery(e.target.value)} placeholder="Buscar cliente, telefone, mesa ou número"/></div><span className="muted">{openServiceTabs.length} abertas</span></div>
+      <div className="service-tab-grid">{filteredServiceTabs.map(t=>{const client=clients.find(c=>c.id===t.clientId);const validTickets=t.tickets.filter(x=>x.status!=='cancelado'),itemCount=validTickets.flatMap(x=>x.items).reduce((s,i)=>s+i.qty,0),tabTotal=validTickets.flatMap(x=>x.items).reduce((s,i)=>s+i.qty*i.price,0);return <button className="service-tab-card" key={t.id} onClick={()=>setActiveServiceTab(t)}><div className="service-tab-top"><span>Comanda #{String(t.id).padStart(3,'0')}</span><b>{t.mode==='local'?'Consumo local':t.mode==='retirada'?'Retirada':'Delivery'}</b></div><h3>{client?.name||'Cliente'}</h3><p><Phone size={14}/>{client?.phone}</p>{t.table&&<p><MapPin size={14}/>Mesa {t.table}</p>}<div className="service-tab-bottom"><span>{validTickets.length} pedido{validTickets.length===1?'':'s'} · {itemCount} itens</span><strong>{money(tabTotal)}</strong></div></button>})}</div>
       {!filteredServiceTabs.length&&<div className="empty-table">Nenhuma comanda aberta.</div>}
+      {serviceTabs.some(t=>t.status==='fechada')&&<div className="closed-tabs"><h3>Fechadas recentemente</h3>{serviceTabs.filter(t=>t.status==='fechada').slice(0,5).map(t=>{const client=clients.find(c=>c.id===t.clientId);return <div key={t.id}><span>Comanda #{String(t.id).padStart(3,'0')} · {client?.name}</span><small>{t.closedAt?new Date(t.closedAt).toLocaleString('pt-BR'):''}</small><strong>Venda #{String(t.saleId||0).padStart(4,'0')}</strong></div>})}</div>}
+    </Section>}
+
+    {tab==='cozinha'&&<Section title="Cozinha e retirada" subtitle="Pedidos em produção, prontos e entregues no balcão.">
+      <div className="operation-metrics"><div><Clock3/><span>Em preparo</span><strong>{operationalTickets.filter(x=>x.ticket.status==='preparo').length}</strong></div><div><CheckCircle2/><span>Prontos</span><strong>{operationalTickets.filter(x=>x.ticket.status==='pronto').length}</strong></div><div><Bike/><span>Em entrega</span><strong>{operationalTickets.filter(x=>x.ticket.status==='entrega').length}</strong></div></div>
+      <div className="kitchen-board">{operationalTickets.filter(x=>['preparo','pronto'].includes(x.ticket.status)).map(x=><OperationTicketCard key={x.ticket.id} {...x} onStatus={updateTicketStatus} onCancel={cancelTicket}/>)}</div>
+      {!operationalTickets.some(x=>['preparo','pronto'].includes(x.ticket.status))&&<div className="empty-table">Nenhum pedido aguardando a cozinha.</div>}
+    </Section>}
+
+    {tab==='delivery'&&<Section title="Delivery" subtitle="Acompanhamento das entregas desde a saída até a conclusão.">
+      <div className="delivery-board">{operationalTickets.filter(x=>x.serviceTab.mode==='delivery'&&x.ticket.status==='entrega').map(x=><OperationTicketCard key={x.ticket.id} {...x} onStatus={updateTicketStatus} onCancel={cancelTicket}/>)}</div>
+      {!operationalTickets.some(x=>x.serviceTab.mode==='delivery'&&x.ticket.status==='entrega')&&<div className="empty-table">Nenhum pedido saiu para entrega.</div>}
+      <div className="closed-tabs"><h3>Entregas concluídas</h3>{operationalTickets.filter(x=>x.serviceTab.mode==='delivery'&&x.ticket.status==='concluido').slice(-8).reverse().map(x=><div key={x.ticket.id}><span>Pedido #{String(x.ticket.id).padStart(3,'0')} · {x.client?.name}</span><small>{x.serviceTab.address}</small><strong>Entregue</strong></div>)}</div>
     </Section>}
 
     {tab==='historico'&&<Section title="Histórico de vendas" subtitle="Vendas auditáveis, inclusive cancelamentos.">
       <div className="toolbar"><div className="search compact"><Search size={18}/><input value={historyQuery} onChange={e=>setHistoryQuery(e.target.value)} placeholder="Buscar venda ou produto"/></div><select value={historyPayment} onChange={e=>setHistoryPayment(e.target.value as 'Todos'|Payment)}><option>Todos</option><option>Pix</option><option>Dinheiro</option><option>Débito</option><option>Crédito</option></select></div>
-      <div className="table-card"><table><thead><tr><th>Venda</th><th>Data e hora</th><th>Pagamento</th><th>Itens</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>{filteredSales.map(s=><tr key={s.id} className={s.canceledAt?'row-canceled':''}><td>#{String(s.id).padStart(4,'0')}</td><td>{new Date(s.createdAt).toLocaleString('pt-BR')}</td><td><span className="pill">{s.payment}</span></td><td>{s.items.reduce((a,b)=>a+b.qty,0)}</td><td><strong>{money(s.total)}</strong></td><td>{s.canceledAt?<span className="status-canceled">Cancelada</span>:<span className="status-ok">Concluída</span>}</td><td><button className="icon-btn" onClick={()=>setSaleModal(s)} title="Ver detalhes"><Eye size={17}/></button></td></tr>)}</tbody></table>{!filteredSales.length&&<div className="empty-table">Nenhuma venda encontrada.</div>}</div>
+      <div className="table-card"><table><thead><tr><th>Venda</th><th>Origem</th><th>Data e hora</th><th>Pagamento</th><th>Itens</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>{filteredSales.map(s=><tr key={s.id} className={s.canceledAt?'row-canceled':''}><td>#{String(s.id).padStart(4,'0')}</td><td><span className="pill">{s.origin==='comanda'?`Comanda #${String(s.serviceTabId).padStart(3,'0')}`:'Balcão'}</span></td><td>{new Date(s.createdAt).toLocaleString('pt-BR')}</td><td><span className="pill">{s.payment}</span></td><td>{s.items.reduce((a,b)=>a+b.qty,0)}</td><td><strong>{money(s.total)}</strong></td><td>{s.canceledAt?<span className="status-canceled">Cancelada</span>:<span className="status-ok">Concluída</span>}</td><td><button className="icon-btn" onClick={()=>setSaleModal(s)} title="Ver detalhes"><Eye size={17}/></button></td></tr>)}</tbody></table>{!filteredSales.length&&<div className="empty-table">Nenhuma venda encontrada.</div>}</div>
     </Section>}
 
     {tab==='estoque'&&<Section title="Estoque" subtitle={lastCreatedId?'Produto salvo. O item mais recente aparece primeiro.':'Toda alteração manual agora gera histórico.'}>
@@ -304,7 +344,8 @@ export default function App(){
    {clientModal!==undefined&&<ClientModal client={clientModal} onClose={()=>setClientModal(undefined)} onSave={saveClient}/>}
    {barProductModal!==undefined&&<BarProductModal product={barProductModal} onClose={()=>setBarProductModal(undefined)} onSave={saveProduct}/>}
    {serviceTabModal&&<OpenServiceTabModal clients={clients} onClose={()=>setServiceTabModal(false)} onSave={openServiceTab}/>}
-   {activeServiceTab&&<ServiceTabModal serviceTab={activeServiceTab} client={clients.find(c=>c.id===activeServiceTab.clientId)} products={products.filter(p=>p.active&&productArea(p)!=='mercearia')} onClose={()=>setActiveServiceTab(null)} onSend={sendKitchenTicket}/>}
+   {activeServiceTab&&<ServiceTabModal serviceTab={activeServiceTab} client={clients.find(c=>c.id===activeServiceTab.clientId)} products={products.filter(p=>p.active&&productArea(p)!=='mercearia')} onClose={()=>setActiveServiceTab(null)} onSend={sendKitchenTicket} onCloseTab={()=>setClosingServiceTab(activeServiceTab)}/>}
+   {closingServiceTab&&<CloseServiceTabModal serviceTab={closingServiceTab} client={clients.find(c=>c.id===closingServiceTab.clientId)} onClose={()=>setClosingServiceTab(null)} onConfirm={closeServiceTab}/>}
  </div>
 }
 
@@ -354,12 +395,28 @@ function OpenServiceTabModal({clients,onClose,onSave}:{clients:Client[],onClose:
  return <div className="modal-backdrop"><form className="modal product-modal service-open-modal" onSubmit={e=>{e.preventDefault();if(isNew&&(!name.trim()||!phone.trim()))return;if(!isNew&&!clientId)return;onSave({clientId:isNew?undefined:Number(clientId),name,phone,cpf,mode,table,address,notes})}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>Abrir comanda</h2><p>Selecione um cliente ou faça o primeiro cadastro sem sair do atendimento.</p><label>Cliente<select value={clientId} onChange={e=>setClientId(e.target.value)}><option value="new">+ Novo cliente</option>{clients.map(c=><option value={c.id} key={c.id}>{c.name} · {c.phone}</option>)}</select></label>{isNew&&<><div className="form-row"><label>Nome<input autoFocus value={name} onChange={e=>setName(e.target.value)} required placeholder="Nome do cliente"/></label><label>Telefone<input value={phone} onChange={e=>setPhone(e.target.value)} required inputMode="tel" placeholder="(62) 99999-9999"/></label></div><label>CPF <small>(opcional)</small><input value={cpf} onChange={e=>setCpf(e.target.value)} inputMode="numeric" placeholder="000.000.000-00"/></label></>}<label>Tipo de atendimento</label><div className="mode-picker">{([['local','Consumo local'],['retirada','Retirada'],['delivery','Delivery']] as [OrderMode,string][]).map(([value,label])=><button type="button" key={value} className={mode===value?'active':''} onClick={()=>setMode(value)}>{label}</button>)}</div>{mode==='local'&&<label>Mesa ou identificação <small>(opcional)</small><input value={table} onChange={e=>setTable(e.target.value)} placeholder="Ex.: 04 ou Balcão"/></label>}{mode==='delivery'&&<label>Endereço de entrega<input value={address} onChange={e=>setAddress(e.target.value)} required placeholder="Rua, número e referência"/></label>}<label>Observação <small>(opcional)</small><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Informação geral da comanda"/></label><button className="primary" type="submit">Abrir e adicionar pedido</button></form></div>
 }
 
-function ServiceTabModal({serviceTab,client,products,onClose,onSend}:{serviceTab:ServiceTab;client?:Client;products:Product[];onClose:()=>void;onSend:(serviceTabId:number,items:TicketItem[])=>void}){
+function ServiceTabModal({serviceTab,client,products,onClose,onSend,onCloseTab}:{serviceTab:ServiceTab;client?:Client;products:Product[];onClose:()=>void;onSend:(serviceTabId:number,items:TicketItem[])=>boolean;onCloseTab:()=>void}){
  const[query,setQuery]=useState(''),[draft,setDraft]=useState<CartItem[]>([]),[notes,setNotes]=useState('')
  const shown=products.filter(p=>!query||`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()))
  const details=draft.map(i=>({...i,product:products.find(p=>p.id===i.productId)!})).filter(i=>i.product)
  const add=(p:Product)=>setDraft(prev=>{const found=prev.find(i=>i.productId===p.id);if(tracked(p)&&(found?.qty||0)>=p.stock)return prev;return found?prev.map(i=>i.productId===p.id?{...i,qty:i.qty+1}:i):[...prev,{productId:p.id,qty:1}]})
  const change=(p:Product,delta:number)=>setDraft(prev=>prev.map(i=>i.productId===p.id?{...i,qty:Math.max(0,tracked(p)?Math.min(p.stock,i.qty+delta):i.qty+delta)}:i).filter(i=>i.qty>0))
- const allItems=serviceTab.tickets.flatMap(t=>t.items),total=allItems.reduce((s,i)=>s+i.qty*i.price,0),draftTotal=details.reduce((s,i)=>s+i.qty*i.product.price,0)
- return <div className="modal-backdrop"><div className="modal service-tab-modal"><button className="modal-x" onClick={onClose}><X/></button><div className="service-modal-heading"><div><span>Comanda #{String(serviceTab.id).padStart(3,'0')}</span><h2>{client?.name}</h2><p>{client?.phone} · {serviceTab.mode==='local'?'Consumo local':serviceTab.mode==='retirada'?'Retirada':'Delivery'}{serviceTab.table?` · Mesa ${serviceTab.table}`:''}</p></div><div><small>Total atual</small><strong>{money(total)}</strong></div></div><div className="service-workspace"><section><div className="search compact"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar no cardápio"/></div><div className="service-product-list">{shown.map(p=><button key={p.id} onClick={()=>add(p)} disabled={tracked(p)&&p.stock<=0}><span><b>{p.name}</b><small>{p.category} · {tracked(p)?`${p.stock} disponíveis`:'Produção livre'}</small></span><strong>{money(p.price)}</strong></button>)}</div></section><aside><h3>Novo pedido</h3>{details.length?<div className="draft-lines">{details.map(i=><div key={i.productId}><span><b>{i.product.name}</b><small>{money(i.product.price*i.qty)}</small></span><div className="qty-control"><button onClick={()=>change(i.product,-1)}>−</button><b>{i.qty}</b><button onClick={()=>change(i.product,1)}>+</button></div></div>)}</div>:<p className="muted">Clique nos itens para montar o pedido.</p>}<label>Observação deste pedido<input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: sem cebola, carne bem passada"/></label><div className="draft-total"><span>Total</span><strong>{money(draftTotal)}</strong></div><button className="primary" disabled={!draft.length} onClick={()=>{onSend(serviceTab.id,details.map(i=>({productId:i.product.id,name:i.product.name,qty:i.qty,price:i.product.price,notes:notes.trim()||undefined})));setDraft([]);setNotes('')}}>Enviar pedido</button></aside></div>{serviceTab.tickets.length>0&&<div className="ticket-history"><h3>Pedidos enviados</h3>{serviceTab.tickets.map(t=><div className="ticket-row" key={t.id}><span><b>Pedido #{String(t.id).padStart(3,'0')}</b><small>{new Date(t.createdAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · Em preparo</small></span><p>{t.items.map(i=>`${i.qty}x ${i.name}`).join(' · ')}</p><strong>{money(t.items.reduce((s,i)=>s+i.qty*i.price,0))}</strong></div>)}</div>}</div></div>
+ const allItems=serviceTab.tickets.filter(t=>t.status!=='cancelado').flatMap(t=>t.items),total=allItems.reduce((s,i)=>s+i.qty*i.price,0),draftTotal=details.reduce((s,i)=>s+i.qty*i.product.price,0)
+ return <div className="modal-backdrop"><div className="modal service-tab-modal"><button className="modal-x" onClick={onClose}><X/></button><div className="service-modal-heading"><div><span>Comanda #{String(serviceTab.id).padStart(3,'0')}</span><h2>{client?.name}</h2><p>{client?.phone} · {serviceTab.mode==='local'?'Consumo local':serviceTab.mode==='retirada'?'Retirada':'Delivery'}{serviceTab.table?` · Mesa ${serviceTab.table}`:''}</p></div><div><small>Total atual</small><strong>{money(total)}</strong><button className="close-tab-button" disabled={!allItems.length} onClick={()=>draft.length?alert('Envie ou remova os itens do novo pedido antes de fechar a comanda.'):onCloseTab()}>Fechar comanda</button></div></div><div className="service-workspace"><section><div className="search compact"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar no cardápio"/></div><div className="service-product-list">{shown.map(p=><button key={p.id} onClick={()=>add(p)} disabled={tracked(p)&&p.stock<=0}><span><b>{p.name}</b><small>{p.category} · {tracked(p)?`${p.stock} disponíveis`:'Produção livre'}</small></span><strong>{money(p.price)}</strong></button>)}</div></section><aside><h3>Novo pedido</h3>{details.length?<div className="draft-lines">{details.map(i=><div key={i.productId}><span><b>{i.product.name}</b><small>{money(i.product.price*i.qty)}</small></span><div className="qty-control"><button onClick={()=>change(i.product,-1)}>−</button><b>{i.qty}</b><button onClick={()=>change(i.product,1)}>+</button></div></div>)}</div>:<p className="muted">Clique nos itens para montar o pedido.</p>}<label>Observação deste pedido<input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: sem cebola, carne bem passada"/></label><div className="draft-total"><span>Total</span><strong>{money(draftTotal)}</strong></div><button className="primary" disabled={!draft.length} onClick={()=>{const sent=onSend(serviceTab.id,details.map(i=>({productId:i.product.id,name:i.product.name,qty:i.qty,price:i.product.price,trackStock:i.product.trackStock,notes:notes.trim()||undefined})));if(sent){setDraft([]);setNotes('')}}}>Enviar pedido para cozinha</button></aside></div>{serviceTab.tickets.length>0&&<div className="ticket-history"><h3>Pedidos enviados</h3>{serviceTab.tickets.map(t=><div className={`ticket-row ticket-${t.status}`} key={t.id}><span><b>Pedido #{String(t.id).padStart(3,'0')}</b><small>{new Date(t.createdAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · {ticketStatusLabel(t.status)}</small></span><p>{t.items.map(i=>`${i.qty}x ${i.name}`).join(' · ')}</p><strong>{money(t.items.reduce((s,i)=>s+i.qty*i.price,0))}</strong></div>)}</div>}</div></div>
+}
+
+const ticketStatusLabel=(status:TicketStatus)=>({preparo:'Em preparo',pronto:'Pedido pronto',entrega:'Saiu para entrega',concluido:'Concluído',cancelado:'Cancelado'}[status])
+
+function OperationTicketCard({serviceTab,ticket,client,onStatus,onCancel}:{serviceTab:ServiceTab;ticket:KitchenTicket;client?:Client;onStatus:(serviceTabId:number,ticketId:number,status:TicketStatus)=>void;onCancel:(serviceTabId:number,ticket:KitchenTicket)=>void}){
+ const age=Math.max(0,Math.floor((Date.now()-new Date(ticket.createdAt).getTime())/60000))
+ const nextStatus:TicketStatus=serviceTab.mode==='delivery'?(ticket.status==='entrega'?'concluido':'entrega'):ticket.status==='preparo'?'pronto':'concluido'
+ const action=serviceTab.mode==='delivery'?(ticket.status==='entrega'?'Confirmar entrega':'Saiu para entrega'):ticket.status==='preparo'?'Pedido pronto':'Entregue ao cliente'
+ const notes=[...new Set(ticket.items.map(i=>i.notes).filter(Boolean))]
+ return <article className={`operation-ticket ticket-${ticket.status}`}><header><div><span>Pedido #{String(ticket.id).padStart(3,'0')}</span><b>{serviceTab.mode==='local'?'Local':serviceTab.mode==='retirada'?'Retirada':'Delivery'}</b></div><strong>{age>999?'Antigo':`${age} min`}</strong></header><h3>{client?.name}</h3><p className="ticket-location">{serviceTab.table?`Mesa ${serviceTab.table}`:serviceTab.address||'Retirada no balcão'}</p><div className="operation-items">{ticket.items.map((i,index)=><div key={`${i.productId}-${index}`}><span>{i.qty}x</span><p>{i.name}</p></div>)}{notes.map(note=><small className="ticket-note" key={note}>Obs.: {note}</small>)}</div><footer>{serviceTab.status==='aberta'?<button className="ticket-cancel" onClick={()=>onCancel(serviceTab.id,ticket)}>Cancelar</button>:<span className="paid-label">Pago</span>}<button className="ticket-action" onClick={()=>onStatus(serviceTab.id,ticket.id,nextStatus)}>{action}</button></footer></article>
+}
+
+function CloseServiceTabModal({serviceTab,client,onClose,onConfirm}:{serviceTab:ServiceTab;client?:Client;onClose:()=>void;onConfirm:(serviceTab:ServiceTab,payment:Payment,cash?:number)=>void}){
+ const[payment,setPayment]=useState<Payment>('Pix'),[received,setReceived]=useState('')
+ const items=serviceTab.tickets.filter(t=>t.status!=='cancelado').flatMap(t=>t.items),total=items.reduce((s,i)=>s+i.qty*i.price,0),receivedNumber=parseMoney(received),change=Math.max(0,receivedNumber-total)
+ return <div className="modal-backdrop close-layer"><form className="modal product-modal close-service-modal" onSubmit={e=>{e.preventDefault();if(payment==='Dinheiro'&&receivedNumber<total)return;onConfirm(serviceTab,payment,payment==='Dinheiro'?receivedNumber:undefined)}}><button type="button" className="modal-x" onClick={onClose}><X/></button><h2>Fechar comanda #{String(serviceTab.id).padStart(3,'0')}</h2><p>{client?.name} · O fechamento criará uma venda finalizada e uma entrada automática no caixa.</p><div className="close-summary"><span>{items.reduce((s,i)=>s+i.qty,0)} itens em {serviceTab.tickets.filter(t=>t.status!=='cancelado').length} pedidos</span><strong>{money(total)}</strong></div><label>Forma de pagamento<select value={payment} onChange={e=>{setPayment(e.target.value as Payment);setReceived('')}}>{(['Pix','Dinheiro','Débito','Crédito'] as Payment[]).map(p=><option key={p}>{p}</option>)}</select></label>{payment==='Dinheiro'&&<><label>Valor recebido<input autoFocus value={received} onChange={e=>setReceived(e.target.value)} inputMode="decimal" placeholder="0,00" required/></label><div className="preview-line emphasis"><span>Troco</span><strong>{money(change)}</strong></div></>}<div className="close-warning">Após confirmar, a comanda sai da lista de abertas e aparece no histórico vinculada à venda.</div><button className="primary" type="submit" disabled={!items.length||(payment==='Dinheiro'&&receivedNumber<total)}>Confirmar pagamento e fechar</button></form></div>
 }

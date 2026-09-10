@@ -40,7 +40,10 @@ Retomar este plano quando o cliente confirmar a contratação e definir:
 
 - fase 1 concluída: cadastro de clientes e cardápio do bar;
 - fase 2 concluída: abertura de comandas por cliente, modalidades de atendimento e múltiplos pedidos separados;
-- próxima fase: painel operacional, andamento da cozinha e ações específicas por modalidade.
+- fase 3 concluída: painel operacional, cozinha, retirada e acompanhamento de delivery;
+- fase 4 concluída: fechamento de comanda, pagamento, venda no histórico, caixa e estoque integrados;
+- publicação web da demo preparada para GitHub Pages;
+- próxima fase da operação real: banco central, usuários e sincronização entre aparelhos.
 
 ## Etapa 1 — congelar e proteger a demo aprovada
 
